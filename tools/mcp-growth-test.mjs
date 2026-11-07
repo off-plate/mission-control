@@ -12,6 +12,7 @@
    `process.env.TZ` and `Date` are pinned: both sides read the same clock. */
 import assert from 'assert/strict'
 import { build } from 'esbuild'
+import { readFileSync } from 'fs'
 import { loadKit, clone, ROOT } from './mcp-test-kit.mjs'
 
 process.env.TZ = 'Europe/Prague'
@@ -91,9 +92,11 @@ function appStore(blob) {
     store,
     async act(fn) { fn(api); await Promise.resolve(); await Promise.resolve(); H.__flush(inst); await Promise.resolve(); await Promise.resolve(); render() },
     get api() { return api },
-    snapshot() { return normalise({ habits: api.habits, routines: api.routines, habitLog: api.habitLog, routineLog: api.routineLog, stepTicks: api.stepTicks, stepLog: api.stepLog, slips: api.slips, records: api.records, removedSeeds: api.removedSeeds }, grave) },
+    snapshot() { return normalise({ goals: api.goals, habits: api.habits, routines: api.routines, habitLog: api.habitLog, routineLog: api.routineLog, stepTicks: api.stepTicks, stepLog: api.stepLog, slips: api.slips, records: api.records, removedSeeds: api.removedSeeds }, grave) },
   }
 }
+/** log rows are a set (the merge unions them by identity); compare them in a canonical order */
+const sortLogs = (r) => { for (const f of ['habitLog', 'routineLog', 'stepTicks', 'stepLog', 'slips']) if (Array.isArray(r[f])) r[f].sort((x, y) => (JSON.stringify(x) < JSON.stringify(y) ? -1 : 1)); return r }
 /** Strip what legitimately differs (the clock moment, generated suffixes) and sort keys, so deepEqual means "same rows". */
 function normalise(o, grave) {
   const walk = (v, key) => {
@@ -103,13 +106,14 @@ function normalise(o, grave) {
     return v
   }
   const r = walk(JSON.parse(JSON.stringify(o)))
+  sortLogs(r)
   r.grave = Object.fromEntries([...grave].filter(([k]) => !/^(count|amt)#/.test(k)).map(([k, u]) => [k.replace(/\|(count|amt)#.*$/, '|$1#'), u]).sort(([a], [b]) => (a < b ? -1 : 1)))
   return r
 }
 function opsSnapshot(b) {
   const grave = new Map()
   for (const t of b.graveyard ?? []) grave.set(t.k, !!t.undone)
-  return normalise({ habits: b.habits ?? [], routines: b.routines ?? [], habitLog: b.habitLog ?? [], routineLog: b.routineLog ?? [], stepTicks: b.stepTicks ?? [], stepLog: b.stepLog ?? [], slips: b.slips ?? [], records: b.records ?? {}, removedSeeds: b.removedSeeds ?? [] }, grave)
+  return normalise({ goals: b.goals ?? [], habits: b.habits ?? [], routines: b.routines ?? [], habitLog: b.habitLog ?? [], routineLog: b.routineLog ?? [], stepTicks: b.stepTicks ?? [], stepLog: b.stepLog ?? [], slips: b.slips ?? [], records: b.records ?? {}, removedSeeds: b.removedSeeds ?? [] }, grave)
 }
 
 /** Run `app(store)` on the real hook and `ops(blob)` on the port from the same start; deepEqual the results. */
@@ -119,10 +123,13 @@ async function same(label, start, app, ops, known) {
   const b = clone(start)
   ops(b)
   let mine = opsSnapshot(b)
-  if (known) mine = known(mine)
+  if (known) mine = sortLogs(known(mine))
   assert.deepEqual(mine, s.snapshot(), `differential: ${label}`)
   return b
 }
+/** The port digs up a backfilled day only when it already holds a tombstone for it (setLog in ops-growth.ts: a multi-year backfill must not
+ *  push real tombstones out of the 900-entry graveyard). The app digs up every one, so this adds those entries to the port's snapshot. */
+const appDigsSince = (snap) => { const o = JSON.parse(JSON.stringify(snap)); for (const x of o.habitLog) if (x.src === 'since') o.grave[`habitLog:${x.habitId}|${x.day}|since`] = true; return o }
 /** The ONE place the port deliberately differs from the app (see the header of ops-growth.ts): when a routine
  *  tick finishes the routine, applyRoutine writes the step's habit row and then markDay() overwrites the whole
  *  habit log from a copy taken BEFORE that row, so the app loses the last step's habit row and buries it. The
@@ -314,18 +321,21 @@ for (const at of CLOCKS) {
   /* --- editing steps and the plan --- */
   {
     const s = growth()
+    /* The port ALSO makes the new step a habit in the routine's folder (what the Habits page's New > Routine does, addRoutineWithSteps);
+       the app's addRoutineStep alone does not. So the port's extra habit is compared separately, below, and set aside here. */
+    const noStepHabit = (o) => ({ ...o, habits: o.habits.filter((h) => !/^h-r-wind-st/.test(h.id)) })
     for (const step of ['One', 'Two']) {
       // ids are generated; compare through the title instead
       const app = appStore(s); await app.act((a) => a.addRoutineStep('r-wind', { title: step }))
       const b = clone(s); G.addRoutineStep(b, { id: 'r-wind' }, step)
-      const strip = (o) => ({ ...o, routines: o.routines.map((r) => ({ ...r, steps: r.steps.map((x) => ({ ...x, id: x.id.startsWith('st-') ? 'st-*' : x.id })) })) })
+      const strip = (o) => noStepHabit({ ...o, routines: o.routines.map((r) => ({ ...r, steps: r.steps.map((x) => ({ ...x, id: x.id.startsWith('st-') ? 'st-*' : x.id })) })) })
       assert.deepEqual(strip(opsSnapshot(b)), strip(app.snapshot()), `differential: add step ${step}`); diffs++
     }
     // adding a required step to a finished routine reopens it (routineLog and the streak habit go)
     const fin = growth(); G.routineDone(fin, { id: 'r-wind' }, true)
     const app = appStore(fin); await app.act((a) => a.addRoutineStep('r-wind', { title: 'Late step' }))
     const b = clone(fin); G.addRoutineStep(b, { id: 'r-wind' }, 'Late step')
-    const strip = (o) => ({ ...o, routines: o.routines.map((r) => ({ ...r, steps: r.steps.map((x) => ({ ...x, id: x.id.startsWith('st-') ? 'st-*' : x.id })) })) })
+    const strip = (o) => noStepHabit({ ...o, routines: o.routines.map((r) => ({ ...r, steps: r.steps.map((x) => ({ ...x, id: x.id.startsWith('st-') ? 'st-*' : x.id })) })) })
     assert.deepEqual(strip(opsSnapshot(b)), strip(app.snapshot()), 'differential: adding a step to a finished routine reopens it'); diffs++
     assert.equal(b.routines.find((r) => r.id === 'r-wind').completedOn, null)
     // removing the last unticked step finishes the routine
@@ -386,7 +396,7 @@ for (const at of CLOCKS) {
     await same_('edit a quit cost (setLook)', s, (a) => a.setLook('habit', 'h-quit', { dailyCost: 90 }), (b) => G.editHabit(b, { id: 'h-quit' }, { dailyCost: 90 }))
     // the start date moving earlier claims the days it reached back over
     const started = growth(); const hs = started.habits.find((h) => h.id === 'h-stretch'); hs.startedOn = D(-3); hs.filledSince = D(-3)
-    await same_('start date moved earlier backfills only the new days', started, (a) => a.updateHabit('h-stretch', { startedOn: D(-6) }), (b) => G.editHabit(b, { id: 'h-stretch' }, { startedOn: D(-6) }))
+    await same_('start date moved earlier backfills only the new days', started, (a) => a.updateHabit('h-stretch', { startedOn: D(-6) }), (b) => G.editHabit(b, { id: 'h-stretch' }, { startedOn: D(-6) }), appDigsSince)
     await same_('start date moved later changes no logged day', started, (a) => a.updateHabit('h-stretch', { startedOn: D(-1) }), (b) => G.editHabit(b, { id: 'h-stretch' }, { startedOn: D(-1) }))
   }
 
@@ -399,7 +409,7 @@ for (const at of CLOCKS) {
       await app.act((a) => a.addHabit(appInput))
       const newApp = app.api.habits[n0].id
       const b = clone(s); const r = G.addHabit(b, input)
-      assert.deepEqual(swap(opsSnapshot(b), r.id), swap(app.snapshot(), newApp), `differential: ${label}`); diffs++
+      assert.deepEqual(swap(appDigsSince(opsSnapshot(b)), r.id), swap(app.snapshot(), newApp), `differential: ${label}`); diffs++
       return b
     }
     await addBoth('add a plain habit', { name: 'Journal' }, { name: 'Journal', frequency: 'daily', kind: 'build' })
@@ -416,6 +426,157 @@ for (const at of CLOCKS) {
     const nb = b.routines.at(-1)
     assert.deepEqual(swap(swap(opsSnapshot(b), nb.id), nb.habitId), swap(swap(app.snapshot(), r.id), r.habitId), 'differential: add a routine'); diffs++
     assert.equal(out.id, nb.id)
+  }
+
+  /* ======== MCP v3: the operations that used to be refused, against the real hook ======== */
+  /** KNOWN APP BUG, kept out of the port on purpose. When a routine goes from finished to open, applyRoutine removes the step's habit
+   *  row and then markDay() rewrites the habit log from a copy taken BEFORE that removal, so the app puts the step row back (and never
+   *  buries it); after a reload the step shows ticked again while the routine card shows it open. The port removes and buries the row,
+   *  as the step habit's own checkbox does. This maps the port's snapshot to what the app leaves, and nothing else. */
+  const appKeepsRows = (...rows) => (snap) => {
+    const o = JSON.parse(JSON.stringify(snap))
+    for (const [habitId, src] of rows) {
+      o.habitLog.push(src ? { day: t, habitId, src } : { day: t, habitId })
+      o.grave[`habitLog:${habitId}|${t}|${src ?? ''}`] = true
+    }
+    return o
+  }
+  const run = (id, steps) => { const f = growth(); for (const st of steps) G.routineStep(f, { id }, { stepId: st }); return f }
+  {
+    const fin = run('r-ev', ['s1', 's2'])
+    assert.equal(fin.routineLog.length, 1)
+    // the step card: untick one step of a finished routine
+    await same_('V3 routine_step untick of a FINISHED routine (step habits): finish, streak day, step rows', fin,
+      (a) => a.toggleRoutineStep('r-ev', 's1'), (b) => G.routineStep(b, { id: 'r-ev' }, { stepId: 's1' }, { done: false }), appKeepsRows(['h-r-ev-s1', 'r-ev:s1#0']))
+    // the habit page: untick the step habit of a finished routine
+    await same_('V3 tick_habit untick of a step habit of a FINISHED routine', fin,
+      (a) => a.markHabitOn('h-r-ev-s1', t, false), (b) => G.tickHabit(b, { id: 'h-r-ev-s1' }, { done: false }))
+    // the routine card's button: reopen the whole finished routine
+    await same_('V3 routine_done false on a finished routine with step habits', fin,
+      (a) => a.setRoutineDone('r-ev', false), (b) => G.routineDone(b, { id: 'r-ev' }, false), appKeepsRows(['h-r-ev-s1', 'r-ev:s1#0'], ['h-r-ev-s2', 'r-ev:s2#0']))
+    const wind = run('r-wind', ['w1', 'w2'])
+    await same_('V3 routine_done false on a finished routine (no step habits)', wind, (a) => a.setRoutineDone('r-wind', false), (b) => G.routineDone(b, { id: 'r-wind' }, false))
+    // a half-done routine with two ticked step habits
+    const mo = growth(); G.routineStep(mo, { id: 'r-mo' }, { stepId: 'mr5' }, { alt: 'a1' }); G.routineStep(mo, { id: 'r-mo' }, { stepId: 'mr6' })
+    await same_('V3 routine_done false on a half-done routine (2 step habits ticked)', mo, (a) => a.setRoutineDone('r-mo', false), (b) => G.routineDone(b, { id: 'r-mo' }, false))
+    // a routine's own streak habit, today: the routine card's button
+    await same_('V3 tick_habit on a routine\'s own streak habit (today) = setRoutineDone true', growth(), (a) => a.setRoutineDone('r-wind', true), (b) => G.tickHabit(b, { id: 'h-wind' }, {}))
+    await same_('V3 tick_habit done:false on a finished routine\'s streak habit = setRoutineDone false', wind, (a) => a.setRoutineDone('r-wind', false), (b) => G.tickHabit(b, { id: 'h-wind' }, { done: false }))
+  }
+  {
+    // a paused habit can be ticked
+    const p = growth(); p.habits.find((h) => h.id === 'h-stretch').paused = true
+    await same_('V3 a paused habit is ticked', p, (a) => a.markHabitOn('h-stretch', t, true), (b) => G.tickHabit(b, { id: 'h-stretch' }, {}))
+    const pw = growth(); pw.habits.find((h) => h.id === 'h-walk').paused = true; pw.habits.find((h) => h.id === 'h-water').paused = true
+    await same_('V3 a paused counted habit is counted', pw, (a) => a.logCount('h-walk', 1), (b) => G.habitCount(b, { id: 'h-walk' }, 1))
+    await same_('V3 a paused amount habit takes an amount', pw, (a) => a.logAmount('h-water', 250), (b) => G.logAmount(b, { id: 'h-water' }, 250))
+    const pg = growth(); pg.habits.find((h) => h.id === 'h-r-mo-mr4').paused = true
+    await same_('V3 a paused gated habit takes its number', pg, (a) => a.logHabitNumber('h-r-mo-mr4', 80), (b) => G.habitCount(b, { id: 'h-r-mo-mr4' }, 80))
+    // count -2 = two taps
+    const two = growth(); G.habitCount(two, { id: 'h-walk' }, 3)
+    const app = appStore(two); await app.act((a) => a.logCount('h-walk', -1)); await app.act((a) => a.logCount('h-walk', -1))
+    const bb = clone(two); G.habitCount(bb, { id: 'h-walk' }, -2); assert.deepEqual(opsSnapshot(bb), app.snapshot(), 'differential: count -2 is two taps'); diffs++
+  }
+  {
+    // alternatives: untick without saying which one
+    const alt = growth(); G.routineStep(alt, { id: 'r-mo' }, { stepId: 'mr5' }, { alt: 'a2' })
+    await same_('V3 routine step with alternatives unticked without alt (clears the chosen one)', alt, (a) => a.toggleRoutineAlt('r-mo', 'mr5', 'a2'), (b) => G.routineStep(b, { id: 'r-mo' }, { stepId: 'mr5' }, { done: false }))
+    const noChoice = growth(); G.routineDone(noChoice, { id: 'r-mo' }, true)
+    await same_('V3 a step with alternatives ticked by routine_done (no choice) is unticked', noChoice, (a) => a.toggleRoutineStep('r-mo', 'mr5'), (b) => G.routineStep(b, { id: 'r-mo' }, { stepId: 'mr5' }, { done: false }))
+    const loose = growth(); G.tickHabit(loose, { id: 'h-alt' }, { alt: 'x1' })
+    await same_('V3 loose habit with alternatives unticked without alt', loose, (a) => a.pickHabitAlt('h-alt', 'x1'), (b) => G.tickHabit(b, { id: 'h-alt' }, { done: false }))
+  }
+  {
+    // delete a routine whose habit a goal counts off; archive its streak habit = the same
+    const g = growth(); g.goals = [{ id: 'g1', space: 'personal', name: 'Evenings', habitId: 'h-evening', current: 2, target: 10, unit: 'checkoffs', timeframe: 'quarter' }, { id: 'g2', space: 'personal', name: 'Other', habitId: 'h-read', current: 1, target: 5, unit: 'checkoffs' }]
+    g.habits.find((h) => h.id === 'h-evening').days = [true, true, false, false, false, false, false]; g.habits.find((h) => h.id === 'h-evening').history = [3, 4]
+    await same_('V3 delete_routine detaches the goal that counted off it', g, (a) => a.deleteRoutine('r-ev'), (b) => G.deleteRoutine(b, { id: 'r-ev' }))
+    await same_('V3 archive_habit on a routine\'s streak habit deletes the routine', g, (a) => a.deleteRoutine('r-ev'), (b) => G.archiveHabit(b, { id: 'h-evening' }))
+  }
+  {
+    // start dates far back, quit frequency, focus-minute habits, colour and icon
+    const swap = (snap, id) => JSON.parse(JSON.stringify(snap).split(id).join('NEW'))
+    /* The port digs up a backfilled day only when it already holds a tombstone for it (see setLog in ops-growth.ts: a multi-year backfill
+       must not push real tombstones out of the 900-entry graveyard). The app digs up all of them, so those entries are set aside here. */
+    const noSince = (o) => { for (const k of Object.keys(o.grave)) if (/\|since$/.test(k)) delete o.grave[k]; return o }
+    const addBoth = async (label, input, appInput) => {
+      const s0 = growth(); const app = appStore(s0); const n0 = app.api.habits.length
+      await app.act((a) => a.addHabit(appInput))
+      const b = clone(s0); const r = G.addHabit(b, input)
+      assert.deepEqual(swap(appDigsSince(opsSnapshot(b)), r.id), swap(app.snapshot(), app.api.habits[n0].id), `differential: ${label}`); diffs++
+    }
+    await addBoth('V3 add a habit started 400 days ago', { name: 'Old habit', startedOn: D(-400) }, { name: 'Old habit', frequency: 'daily', kind: 'build', startedOn: D(-400) })
+    await addBoth('V3 add a habit started 3 years ago', { name: 'Older', startedOn: D(-1100) }, { name: 'Older', frequency: 'daily', kind: 'build', startedOn: D(-1100) })
+    await addBoth('V3 add a quit with a check-in frequency', { name: 'Vaping', breaking: true, frequency: 'weekly', quitSince: D(-5) }, { name: 'Vaping', frequency: 'weekly', kind: 'break', quitSince: D(-5) })
+    await addBoth('V3 add a quit with colour and icon', { name: 'Vaping', breaking: true, color: '#F87171', icon: 'eye', dailyCost: 50 }, { name: 'Vaping', frequency: 'daily', kind: 'break', color: '#F87171', icon: 'eye', dailyCost: 50 })
+    await addBoth('V3 add a habit kept by focus minutes', { name: 'Deep work 2', track: 'minutes', minutesTarget: 45, daypart: 'morning' }, { name: 'Deep work 2', frequency: 'daily', kind: 'measured', measure: 'minutes', dailyTargetMin: 45, source: 'focus', daypart: 'morning' })
+    await addBoth('V3 add a counted habit with colour and icon', { name: 'Cold 3', track: 'count', countTarget: 8, color: '#38BDF8', icon: 'bolt' }, { name: 'Cold 3', frequency: 'daily', kind: 'measured', measure: 'times', per: 'day', targetCount: 8, color: '#38BDF8', icon: 'bolt' })
+  }
+  {
+    // editing: the Habit sheet (updateHabit with the whole shape) and the look sheet (setLook)
+    const sheet = (h, over) => ({ name: h.name, daypart: h.daypart, frequency: h.frequency, targetPerWeek: undefined, kind: 'build', measure: undefined, per: undefined, targetCount: undefined, dailyTargetMin: undefined, source: undefined, quitSince: undefined, startedOn: h.startedOn ?? t, ...over })
+    const s0 = growth(); const H = (id) => s0.habits.find((h) => h.id === id)
+    await same_('V3 edit: a plain habit becomes a quit', s0, (a) => a.updateHabit('h-stretch', sheet(H('h-stretch'), { kind: 'break', daypart: undefined, startedOn: undefined, quitSince: D(-3) })), (b) => G.editHabit(b, { id: 'h-stretch' }, { kind: 'quit', quitSince: D(-3) }))
+    await same_('V3 edit: a plain habit becomes counted', s0, (a) => a.updateHabit('h-stretch', sheet(H('h-stretch'), { kind: 'measured', measure: 'times', per: 'week', targetCount: 4 })), (b) => G.editHabit(b, { id: 'h-stretch' }, { kind: 'count', countTarget: 4, countPer: 'week' }))
+    await same_('V3 edit: a plain habit becomes kept by focus minutes', s0, (a) => a.updateHabit('h-stretch', sheet(H('h-stretch'), { kind: 'measured', measure: 'minutes', source: 'focus', dailyTargetMin: 30 })), (b) => G.editHabit(b, { id: 'h-stretch' }, { kind: 'minutes', minutesTarget: 30 }))
+    await same_('V3 edit: a counted habit becomes a plain tick', s0, (a) => a.updateHabit('h-walk', sheet(H('h-walk'), { kind: 'build' })), (b) => G.editHabit(b, { id: 'h-walk' }, { kind: 'keep' }))
+    await same_('V3 edit: a quit becomes a plain tick', s0, (a) => a.updateHabit('h-quit', sheet(H('h-quit'), { kind: 'build', frequency: 'daily' })), (b) => G.editHabit(b, { id: 'h-quit' }, { kind: 'keep' }))
+    await same_('V3 edit: a habit with a start date in the past, via the sheet', s0, (a) => a.updateHabit('h-stretch', { startedOn: D(-500) }), (b) => G.editHabit(b, { id: 'h-stretch' }, { startedOn: D(-500) }), appDigsSince)
+    await same_('V3 edit: colour and icon of a habit (setLook)', s0, (a) => a.setLook('habit', 'h-stretch', { color: '#A78BFA' }), (b) => G.editHabit(b, { id: 'h-stretch' }, { color: '#a78bfa' }))
+    await same_('V3 edit: icon of a habit (setLook)', s0, (a) => a.setLook('habit', 'h-stretch', { icon: 'sun' }), (b) => G.editHabit(b, { id: 'h-stretch' }, { icon: 'sun' }))
+    await same_('V3 edit: quick amounts (setLook)', s0, (a) => a.setLook('habit', 'h-water', { presets: [100, 300, 700] }), (b) => G.editHabit(b, { id: 'h-water' }, { presets: [100, 300, 700] }))
+    await same_('V3 edit: clear a quit cost (setLook)', s0, (a) => a.setLook('habit', 'h-quit', { dailyCost: undefined }), (b) => G.editHabit(b, { id: 'h-quit' }, { dailyCost: null }))
+    await same_('V3 edit: colour of a routine (setLook)', s0, (a) => a.setLook('routine', 'r-wind', { color: '#34D399' }), (b) => G.editRoutine(b, { id: 'r-wind' }, { color: '#34D399' }))
+    await same_('V3 edit: icon of a routine (setLook)', s0, (a) => a.setLook('routine', 'r-wind', { icon: 'bulb' }), (b) => G.editRoutine(b, { id: 'r-wind' }, { icon: 'bulb' }))
+    await same_('V3 edit: the part of the day of a routine\'s own habit (locked habit, daypart only)', s0, (a) => a.updateHabit('h-wind', { daypart: 'evening' }), (b) => G.editHabit(b, { id: 'h-wind' }, { daypart: 'evening' }), (snap) => { const o = JSON.parse(JSON.stringify(snap)); const h = o.habits.find((x) => x.id === 'h-wind'); delete h.partSet; return o })
+  }
+  {
+    // a routine made the way the Habits page makes it, and a step added to it
+    const swapAll = (snap, pairs) => { let str = JSON.stringify(snap); for (const [from, to] of pairs) str = str.split(from).join(to); return JSON.parse(str) }
+    for (const [label, input, appInput] of [
+      ['daily with a daypart, colour and icon', { title: 'Lunch', cadence: 'daily', daypart: 'noon', steps: ['Walk', 'Eat'], color: '#38BDF8', icon: 'sun' }, { title: 'Lunch', cadence: 'daily', daypart: 'noon', steps: ['Walk', 'Eat'], color: '#38BDF8', icon: 'sun' }],
+      ['weekdays', { title: 'Before work', cadence: 'prework', steps: ['Shower'] }, { title: 'Before work', cadence: 'prework', steps: ['Shower'] }],
+      ['whenever I need it (repeatable)', { title: 'Reset', cadence: 'daily', repeatable: true, steps: ['Breathe', 'Walk'] }, { title: 'Reset', cadence: 'daily', repeatable: true, steps: ['Breathe', 'Walk'] }],
+    ]) {
+      const s0 = growth(); const app = appStore(s0); const n0 = app.api.routines.length, h0 = app.api.habits.length
+      await app.act((a) => a.addRoutineWithSteps(appInput))
+      const ar = app.api.routines[n0]
+      const b = clone(s0); const out = G.addRoutine(b, input); const mr = b.routines.at(-1)
+      const pairs = (rr, habs) => [[rr.id, 'RID'], [rr.habitId, 'RHID'], ...rr.steps.map((st, k) => [st.id, `STEP${k}`])]
+      assert.deepEqual(swapAll(opsSnapshot(b), pairs(mr)), swapAll(app.snapshot(), pairs(ar)), `differential: V3 add a routine with steps (${label})`); diffs++
+      assert.equal(out.id, mr.id)
+    }
+    // add_routine_step: the new step's habit is the one addRoutineWithSteps makes for its step
+    const s1 = growth(); G.addRoutine(s1, { title: 'Lunch', cadence: 'daily', daypart: 'noon', steps: ['Walk'] }); const rr = s1.routines.at(-1)
+    G.addRoutineStep(s1, { id: rr.id }, 'Eat')
+    const made = rr.steps.map((st) => s1.habits.find((h) => h.id === `h-${rr.id}-${st.id}`))
+    assert.deepEqual(made.map((h) => [h.name, h.folderOrder, h.daypart, h.frequency, h.kind, h.partSet, h.startedOn, h.folderId]), [['Walk', 0, 'noon', 'daily', 'build', true, t, rr.id], ['Eat', 1, 'noon', 'daily', 'build', true, t, rr.id]], 'a step added later is a habit shaped like the ones the Habits page makes')
+    const ticked = clone(s1); G.routineStep(ticked, { id: rr.id }, { step: 'eat' })
+    assert.ok(ticked.habitLog.some((x) => x.habitId === made[1].id), 'the new step\'s habit follows its tick')
+  }
+  {
+    // the daily review: "I finished <routine>" yesterday, and bulk ticking
+    const y = D(-1)
+    const s0 = growth()
+    const app = appStore(s0)
+    const steps = s0.habits.filter((h) => h.folderId === 'r-ev' && !h.optional && !h.paused)
+    for (const h of steps) await app.act((a) => a.markHabitOn(h.id, y, true))
+    await app.act((a) => a.assertRoutineOn('h-evening', y, true))
+    const b = clone(s0); G.routineDone(b, { id: 'r-ev' }, true, y)
+    assert.deepEqual(opsSnapshot(b), app.snapshot(), 'differential: V3 the review\'s "I finished it" for yesterday (each write seeing the last)'); diffs++
+    const app2 = appStore(s0)
+    await app2.act((a) => { for (const h of steps) a.markHabitOn(h.id, y, true); a.assertRoutineOn('h-evening', y, true) })
+    assert.ok(app2.api.habitLog.filter((x) => x.day === y).length < b.habitLog.filter((x) => x.day === y).length, 'the app\'s own single-click handler loses writes to its stale copy; the port does not'); diffs++
+    // bulk ticking = the same ticks one after another
+    const app3 = appStore(s0)
+    await app3.act((a) => a.markHabitOn('h-stretch', t, true)); await app3.act((a) => a.markHabitOn('h-read', y, true)); await app3.act((a) => a.markHabitOn('h-r-ev-s1', t, true))
+    const b3 = clone(s0); G.tickHabits(b3, [{ id: 'h-stretch' }, { title: 'read', day: y }, { id: 'h-r-ev-s1' }])
+    assert.deepEqual(opsSnapshot(b3), app3.snapshot(), 'differential: V3 tick_habits equals the ticks done one by one'); diffs++
+    // close the daily review
+    const app4 = appStore(s0); await app4.act((a) => a.closeDaily(true)); const b4 = clone(s0); G.closeDaily(b4, true)
+    assert.equal(b4.dailyDone, app4.api.dailyDone); assert.equal(b4.dailySkipped, undefined)
+    const app5 = appStore(s0); await app5.act((a) => a.closeDaily(false)); const b5 = clone(s0); G.closeDaily(b5, false)
+    assert.equal(b5.dailySkipped, app5.api.dailySkipped); diffs++
   }
 
   /* --- the merge engine view: result survives a stale copy (checked in section 3) --- */
@@ -471,10 +632,10 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   refuses(() => G.tickHabit(b, { id: 'h-walk' }, {}), /counted habit.*habit_count/)
   refuses(() => G.tickHabit(b, { id: 'h-water' }, {}), /amount habit.*log_habit_amount/)
   refuses(() => G.tickHabit(b, { id: 'h-focus' }, {}), /kept by the clock/)
-  refuses(() => G.tickHabit(b, { id: 'h-evening' }, {}), /streak of the routine "Evening".*routine_step/)
+  // LIFTED: a routine's own streak habit today is done through the routine (tested in section 2.15)
   refuses(() => G.tickHabit(b, { id: 'h-r-mo-mr4' }, {}), /locked until today's number reaches 75 WPM.*habit_count/)
   refuses(() => G.tickHabit(b, { id: 'h-r-mo-mr4' }, { done: false }), /locked until/)
-  refuses(() => G.tickHabit(b, { id: 'h-alt' }, {}), /picking one of its alternatives.*x1 \(Cook\), x2 \(Order healthy\)/)
+  refuses(() => G.tickHabit(b, { id: 'h-alt' }, {}), /picking one of its alternatives.*which one is his to say.*x1 \(Cook\), x2 \(Order healthy\)/)
   refuses(() => G.tickHabit(b, { id: 'h-stretch' }, { alt: 'x1' }), /no alternatives/)
   refuses(() => G.tickHabit(b, { id: 'h-alt' }, { alt: 'zzz' }), /No alternative matches/)
   refuses(() => G.tickHabit(b, { id: 'h-alt' }, { alt: 'x1', day: D(-1) }), /only be picked for today/)
@@ -484,8 +645,10 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   refuses(() => G.tickHabit(b, { title: 'zzzz' }, {}), /No habit matches/)
   refuses(() => G.tickHabit(b, { id: 'nope' }, {}), /No habit has the id/)
   refuses(() => G.tickHabit(b, {}, {}), /Say which habit/)
+  // LIFTED: a paused habit can be ticked (the app only stops treating it as due; its dots stay live)
   hrow(b, 'h-stretch').paused = true
-  refuses(() => G.tickHabit(b, { id: 'h-stretch' }, {}), /is paused/)
+  assert.match(G.tickHabit(b, { id: 'h-stretch' }, {}).text, /Kept "Stretch"/)
+  G.tickHabit(b, { id: 'h-stretch' }, { done: false })
   hrow(b, 'h-stretch').paused = false
   hrow(b, 'h-stretch').archivedAt = T
   refuses(() => G.tickHabit(b, { id: 'h-stretch' }, {}), /No habit has the id/, 'an archived habit is gone from his lists')
@@ -528,8 +691,17 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   // the optional step is not needed, and ticking it changes nothing about completion
   G.tickHabit(b, { id: 'h-r-ev-s3' }, {})
   assert.equal(b.routineLog.length, 1)
-  // unticking a required step of a FINISHED routine would remove two habit rows at once: refused with a reason, nothing for commit to write
-  refuses(() => G.tickHabit(b, { id: 'h-r-ev-s1' }, { done: false }), /would remove 2 rows from "habitLog" at once.*at a time/)
+  // LIFTED: unticking a required step of a FINISHED routine takes back the step's row AND the routine's own streak row (2 habitLog rows),
+  // the routine's finish and the step tick. The 2nd habitLog row is declared as a cascade so the writer's safety stop lets it through.
+  const beforeLog = b.habitLog.length
+  assert.match(G.tickHabit(b, { id: 'h-r-ev-s1' }, { done: false }).text, /Unticked "Brush teeth"/)
+  assert.equal(beforeLog - b.habitLog.length, 2, 'two habit rows left: the step and the routine streak')
+  assert.deepEqual(M.shrinkAllowance(b), { habitLog: 1 }, 'exactly one EXTRA habitLog row is declared, nothing else')
+  assert.deepEqual(b.habitLog.map((x) => x.habitId).sort(), ['h-r-ev-s2', 'h-r-ev-s3'])
+  assert.equal(b.routineLog.length, 0); assert.equal(b.routines.find((x) => x.id === 'r-ev').completedOn, null)
+  assert.deepEqual(b.routines.find((x) => x.id === 'r-ev').doneStepIds.sort(), ['s2', 's3'])
+  assert.equal(buried(b, `habitLog:h-evening|${T}|`), true, 'the streak day is buried'); assert.equal(buried(b, `habitLog:h-r-ev-s1|${T}|`), true)
+  assert.equal(buried(b, `routineLog:r-ev|${T}|0|${T}`), true); assert.equal(buried(b, `stepTicks:r-ev|s1|${T}`), true)
   noDupKeys(b)
   // the same through the routine card (no step habits): one row per list, so it works
   const w = growth(); G.routineDone(w, { id: 'r-wind' }, true)
@@ -572,10 +744,17 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   assert.match(r.text, /has to be earned with its own result, so the routine is not finished/)
   assert.equal(b.routineLog.length, 0)
   refuses(() => G.routineDone(b, { id: 'r-empty' }, true), /no steps yet/)
-  // reopening two ticked steps removes two step records: refused, with what to do
-  refuses(() => G.routineDone(b, { id: 'r-mo' }, false), /would remove 2 rows from "(habitLog|stepTicks)" at once.*at a time/)
+  // LIFTED: reopening a routine with two ticked step habits takes back 2 habitLog rows and 2 step ticks, declared as a cascade
+  const logBefore = b.habitLog.length, ticksBefore = b.stepTicks.length
+  assert.equal(logBefore, 2); assert.equal(ticksBefore, 2)
+  assert.match(G.routineDone(b, { id: 'r-mo' }, false).text, /Reopened "Morning"/)
+  assert.deepEqual([b.habitLog.length, b.stepTicks.length, b.routines.find((x) => x.id === 'r-mo').doneStepIds.length], [0, 0, 0])
+  assert.deepEqual(M.shrinkAllowance(b), { habitLog: 1, stepTicks: 1 }, 'exactly the extra rows')
+  assert.equal(buried(b, `habitLog:h-r-mo-mr5|${T}|r-mo:mr5#0`), true); assert.equal(buried(b, `stepTicks:r-mo|mr6|${T}`), true)
   const e = growth(); G.routineDone(e, { id: 'r-wind' }, true)
-  refuses(() => G.routineDone(e, { id: 'r-wind' }, false), /at once/)
+  assert.match(G.routineDone(e, { id: 'r-wind' }, false).text, /Reopened/)
+  assert.deepEqual([e.routineLog.length, e.habitLog.length, e.stepTicks.length], [0, 0, 0], 'finish, streak day and both step ticks all taken back')
+  assert.deepEqual(M.shrinkAllowance(e), { stepTicks: 1 }, 'no step habits here: 2 step ticks go, 1 is free')
 }
 
 /* 2.7 a routine whose period rolled over starts from nothing, like the app's loader */
@@ -603,7 +782,11 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   assert.deepEqual(new Set(b.habitLog.map((x) => x.src)).size, 3); noDupKeys(b)
   assert.match(G.habitCount(b, { id: 'h-walk' }, -1).text, /Took one off.*2 of 2/)
   assert.equal(b.habitLog.length, 2)
-  refuses(() => G.habitCount(b, { id: 'h-walk' }, -2), /one at a time/)
+  // LIFTED: -2 takes the last two back (two taps in the app); more than are logged is a refusal
+  refuses(() => G.habitCount(b, { id: 'h-walk' }, -3), /only 2 logged today/)
+  assert.match(G.habitCount(b, { id: 'h-walk' }, -2).text, /Took 2 off.*0 of 2/); assert.equal(b.habitLog.length, 0)
+  assert.deepEqual(M.shrinkAllowance(b), { habitLog: 1 }, 'two rows left one list: one is declared')
+  G.habitCount(b, { id: 'h-walk' }, 2)
   refuses(() => G.habitCount(b, { id: 'h-walk' }, 0), /other than 0/)
   refuses(() => G.habitCount(b, { id: 'h-walk' }, 51), /typo/)
   refuses(() => G.habitCount(b, { id: 'h-walk' }, NaN), /must be a number/)
@@ -686,8 +869,12 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   const q = hrow(b, G.addHabit(b, { name: 'Vaping', breaking: true, quitSince: D(-5), dailyCost: 80 }).id)
   assert.deepEqual(q, { id: q.id, space: 'personal', name: 'Vaping', frequency: 'daily', kind: 'break', dailyCost: 80, quitSince: D(-5), days: [...WEEK], paused: false })
   assert.equal(hrow(b, G.addHabit(b, { name: 'Vaping 2', breaking: true }).id).quitSince, T, 'a quit runs from today unless he says otherwise')
-  refuses(() => G.addHabit(b, { name: 'Z', breaking: true, frequency: 'daily' }), /takes only a name/)
-  refuses(() => G.addHabit(b, { name: 'Z', breaking: true, startedOn: D(-2) }), /takes only a name/)
+  // LIFTED: the Quit form has a "check in" frequency (habits.tsx HabitSheet), so a quit takes frequency
+  const qw = hrow(b, G.addHabit(b, { name: 'Vaping 3', breaking: true, frequency: 'weekly' }).id)
+  assert.deepEqual([qw.frequency, qw.targetPerWeek, qw.kind], ['weekly', undefined, 'break'])
+  assert.equal(hrow(b, G.addHabit(b, { name: 'Vaping 4', breaking: true, frequency: 'times-per-week', perWeek: 2 }).id).targetPerWeek, 2)
+  refuses(() => G.addHabit(b, { name: 'Z', breaking: true, perWeek: 2 }), /only applies to frequency "times-per-week"/)
+  refuses(() => G.addHabit(b, { name: 'Z', breaking: true, startedOn: D(-2) }), /no "started_on".*Quit form/)
   refuses(() => G.addHabit(b, { name: 'Z', breaking: true, quitSince: D(2) }), /cannot be in the future/)
   refuses(() => G.addHabit(b, { name: 'Z', dailyCost: 5 }), /for a quit habit/)
   const c = hrow(b, G.addHabit(b, { name: 'Cold shower', track: 'count', countTarget: 3, countPer: 'week' }).id)
@@ -705,9 +892,22 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   const since = b.habitLog.filter((x) => x.habitId === s.id)
   assert.deepEqual(since.map((x) => x.day), [D(-4), D(-3), D(-2), D(-1)], 'every day from the start to YESTERDAY, never today')
   assert.ok(since.every((x) => x.src === 'since' && x.at === undefined)); assert.match(s.text, /4 earlier days/)
-  assert.equal(since.every((x) => dug(b, G.logKey('habitLog', x))), true); noDupKeys(b)
+  // a brand-new habit has no tombstones, so a backfill digs nothing up (it would only push real tombstones out of the 900-entry graveyard)
+  assert.equal(since.some((x) => dug(b, G.logKey('habitLog', x))), false); noDupKeys(b)
+  { // ... but a day he once unticked on a habit that already exists is dug up when a backfill covers it again
+    const e = growth(); const sh = hrow(e, 'h-stretch'); sh.startedOn = D(-1); sh.filledSince = D(-1)
+    e.habitLog.push({ habitId: 'h-stretch', day: D(-3), src: 'since' }); G.tickHabit(e, { id: 'h-stretch' }, { day: D(-3), done: false })
+    assert.equal(buried(e, `habitLog:h-stretch|${D(-3)}|since`), true)
+    G.editHabit(e, { id: 'h-stretch' }, { startedOn: D(-4) })
+    assert.deepEqual(e.habitLog.map((x) => x.day).sort(), [D(-4), D(-3), D(-2)].sort(), 'the backfill covers the days before the old start')
+    assert.equal(dug(e, `habitLog:h-stretch|${D(-3)}|since`), true, 'the tombstone it meets is dug up'); assert.equal(dug(e, `habitLog:h-stretch|${D(-4)}|since`), false)
+  }
   assert.equal(hrow(b, s.id).days[WD], false, 'today is left alone')
-  refuses(() => G.addHabit(b, { name: 'R2', startedOn: D(-400) }), /more than 366 days back/)
+  // LIFTED: no 366-day limit, the app has none; a typo guard before 2000 remains
+  const old = G.addHabit(b, { name: 'R2', startedOn: D(-400) })
+  assert.equal(b.habitLog.filter((x) => x.habitId === old.id).length, 400, 'every day from the start to yesterday, like backfillKept'); assert.match(old.text, /400 earlier days/)
+  noDupKeys(b)
+  refuses(() => G.addHabit(b, { name: 'R2b', startedOn: '1999-12-31' }), /before 2000-01-01.*typo/)
   refuses(() => G.addHabit(b, { name: 'R3', startedOn: D(1) }), /cannot be in the future/)
 }
 
@@ -730,7 +930,9 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   assert.match(G.pauseHabit(b, { id: 'h-stretch' }).text, /Paused/); assert.equal(hrow(b, 'h-stretch').paused, true)
   assert.match(G.pauseHabit(b, { id: 'h-stretch' }, true).text, /already paused/)
   assert.match(G.pauseHabit(b, { id: 'h-stretch' }).text, /Resumed/)
-  refuses(() => G.archiveHabit(b, { id: 'h-evening' }), /streak of the routine "Evening".*delete_routine/)
+  // LIFTED: a routine's own streak habit is "deleted with the routine" in the app, so archiving it deletes the routine
+  { const c = clone(b); const out = G.archiveHabit(c, { id: 'h-evening' }); assert.match(out.text, /streak habit of the routine "Evening" and goes with it.*Deleted routine "Evening"/)
+    assert.equal(c.routines.find((r) => r.id === 'r-ev').archivedAt, T); assert.equal(c.habits.find((h) => h.id === 'h-evening').archivedAt, T); assert.ok(c.removedSeeds.includes('r-ev') && c.removedSeeds.includes('h-evening')) }
   G.archiveHabit(b, { id: 'h-stretch' })
   assert.equal(hrow(b, 'h-stretch').archivedAt, T); assert.deepEqual(b.removedSeeds, ['h-stretch'], 'so a reseed cannot bring it back')
   assert.equal(b.habits.some((h) => h.id === 'h-stretch'), true, 'retired, not erased: its history stays readable')
@@ -743,9 +945,11 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   const r = G.addRoutine(b, { title: ' Lunch break ', cadence: 'prework', blurb: 'b', steps: ['Walk', 'Eat', '  '], daypart: 'noon' })
   const row = b.routines.at(-1); const hb = hrow(b, row.habitId)
   assert.equal(row.id, r.id); assert.match(row.id, /^r-/); assert.match(row.habitId, /^h-/)
-  assert.deepEqual(row.steps.map((s) => [s.title, s.kind]), [['Walk', 'do'], ['Eat', 'do']]); row.steps.forEach((s) => assert.match(s.id, /^st-/))
+  assert.deepEqual(row.steps.map((s) => [s.title, s.kind]), [['Walk', 'do'], ['Eat', 'do']]); row.steps.forEach((s) => assert.match(s.id, /^st[0-9a-z]+$/))
   assert.deepEqual([row.cadence, row.blurb, row.periodKey, row.doneStepIds, row.stepData], ['prework', 'b', T, [], {}])
-  assert.deepEqual({ ...hb }, { id: row.habitId, space: 'personal', name: 'Lunch break', daypart: 'noon', kind: 'build', frequency: 'weekdays', days: [...WEEK], paused: false, history: [] })
+  assert.deepEqual({ ...hb }, { id: row.habitId, space: 'personal', name: 'Lunch break', daypart: 'noon', kind: 'build', frequency: 'weekdays', days: [...WEEK], paused: false, history: [], startedOn: T })
+  // with steps the routine is made the way the Habits page makes it (addRoutineWithSteps): every step is a habit in the folder
+  assert.deepEqual(row.steps.map((s, k) => ({ ...hrow(b, `h-${row.id}-${s.id}`) })), row.steps.map((s, k) => ({ id: `h-${row.id}-${s.id}`, space: 'personal', name: s.title, kind: 'build', frequency: 'weekdays', daypart: 'noon', partSet: true, days: [...WEEK], paused: false, history: [], folderId: row.id, folderOrder: k, startedOn: T })))
   refuses(() => G.addRoutine(b, { title: 'lunch BREAK' }), /already a routine called/)
   refuses(() => G.addRoutine(b, { title: ' ' }), /needs a title/)
   refuses(() => G.addRoutine(b, { title: 'X', cadence: 'hourly' }), /cadence must be/)
@@ -762,7 +966,7 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   refuses(() => G.addRoutineStep(b, { id: row.id }, 'stretch'), /already has a step/)
   refuses(() => G.addRoutineStep(b, { id: row.id }, ' '), /needs a title/)
   const rm = G.removeRoutineStep(b, { id: row.id }, { step: 'eat' })
-  assert.deepEqual(row.steps.map((s) => s.title), ['Walk', 'Stretch']); assert.doesNotMatch(rm.text, /still there/, 'a step without a habit leaves nothing behind')
+  assert.deepEqual(row.steps.map((s) => s.title), ['Walk', 'Stretch']); assert.match(rm.text, /Its habit "Eat" is still there; archive_habit removes it/, 'the app leaves the step\'s habit behind')
   const ev = G.removeRoutineStep(b, { id: 'r-ev' }, { step: 'floss' })
   assert.match(ev.text, /Its habit "Floss" is still there; archive_habit removes it/)
   assert.equal(hrow(b, 'h-r-ev-s3').folderId, 'r-ev', 'and the habit is untouched, as in the app')
@@ -776,11 +980,17 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   assert.equal(G.listRoutines(b).routines.find((x) => x.id === row.id).planned.slot, 'noon')
   G.planRoutine(b, { id: row.id }, { clear: true }); assert.equal(row.planned, undefined)
   // delete
-  b.goals = [{ id: 'g1', name: 'Run Lunch', habitId: row.habitId, current: 2, target: 10, unit: 'checkoffs' }]
-  refuses(() => G.deleteRoutine(b, { id: row.id }), /goal "Run Lunch" counts off this routine's habit/)
-  assert.equal(row.archivedAt, undefined)
-  b.goals[0].closed = true
+  // LIFTED: a goal counting off the routine's habit keeps its progress and goes back to hand-logging (growth.ts deleteRoutine + goalCurrent)
+  Object.assign(hrow(b, row.habitId), { days: [true, true, false, false, false, false, false], history: [1, 1, 1] })
+  b.goals = [
+    { id: 'g1', name: 'Run Lunch', habitId: row.habitId, current: 2, target: 10, unit: 'checkoffs', timeframe: 'quarter' },
+    { id: 'g2', name: 'Old lunch goal', habitId: row.habitId, current: 1, target: 10, unit: 'days', closed: { final: 7 } },
+    { id: 'g3', name: 'Unrelated', habitId: 'h-read', current: 4, target: 10, unit: 'checkoffs' },
+  ]
   const dr = G.deleteRoutine(b, { id: row.id })
+  assert.deepEqual(b.goals[0], { id: 'g1', name: 'Run Lunch', current: 5, target: 10, unit: 'done', timeframe: 'quarter' }, 'this week 2 + the 3 weeks of history, unit checkoffs becomes done, link gone')
+  assert.deepEqual(b.goals[1], { id: 'g2', name: 'Old lunch goal', current: 7, target: 10, unit: 'days', closed: { final: 7 } }, 'a closed goal keeps the number it finished on')
+  assert.equal(b.goals[2].habitId, 'h-read', 'another goal is untouched'); assert.match(dr.text, /goals "Run Lunch", "Old lunch goal" counted off its habit/)
   assert.deepEqual([row.archivedAt, hrow(b, row.habitId).archivedAt], [T, T]); assert.ok(b.removedSeeds.includes(row.id) && b.removedSeeds.includes(row.habitId))
   assert.equal(b.routines.includes(row), true, 'archived, never erased')
   const ev2 = G.deleteRoutine(b, { id: 'r-ev' }); assert.match(ev2.text, /3 step habits are still there/)
@@ -798,7 +1008,7 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   assert.equal(by['h-quit'].track, 'quit'); assert.equal(by['h-quit'].daysClean, 2); assert.equal(by['h-quit'].slips, 1); assert.equal(by['h-quit'].bestRun, 8); assert.equal(by['h-quit'].dailyCost, 60)
   assert.match(by['h-quit'].how, /log_slip/)
   assert.deepEqual(by['h-walk'].count, { have: 1, target: 2, per: 'day' }); assert.equal(by['h-walk'].keptToday, false)
-  assert.deepEqual(by['h-water'].amount, { today: 500, target: 2000, unit: 'ml' })
+  assert.deepEqual(by['h-water'].amount, { today: 500, target: 2000, unit: 'ml', presets: [250, 500] })
   assert.equal(by['h-focus'].track, 'auto'); assert.match(by['h-focus'].how, /none/)
   assert.equal(by['h-evening'].track, 'routine'); assert.match(by['h-evening'].how, /routine_step/)
   assert.equal(by['h-r-ev-s1'].routine, 'Evening'); assert.equal(by['h-r-ev-s1'].how, 'tick_habit')
@@ -814,6 +1024,140 @@ const hrow = (b, id) => b.habits.find((h) => h.id === id)
   assert.deepEqual(lr.routines.find((r) => r.id === 'r-ev').progress, { done: 0, total: 2 }); assert.equal(lr.routines.find((r) => r.id === 'r-ev').complete, false)
   assert.equal(G.listRoutines(b, { query: 'sunday' }).count, 1)
 }
+
+/* 2.15 MCP v3: everything the app's pages do that used to be refused */
+{
+  // a routine's own streak habit, today: done through the routine, exactly as the routine card's button
+  const b = growth()
+  const r = G.tickHabit(b, { id: 'h-wind' }, {})
+  assert.match(r.text, /streak of the routine "Wind down", so this was done through the routine/)
+  assert.deepEqual(b.routines.find((x) => x.id === 'r-wind').doneStepIds.sort(), ['w1', 'w2']); assert.equal(b.routineLog.length, 1)
+  assert.ok(b.habitLog.some((x) => x.habitId === 'h-wind' && x.day === T))
+  G.tickHabit(b, { id: 'h-wind' }, { done: false })
+  assert.deepEqual([b.routineLog.length, b.habitLog.length, b.stepTicks.length], [0, 0, 0]); assert.equal(M.shrinkAllowance(b).stepTicks, 1)
+  // a routine with a gated step stays unfinished through its streak habit, and says so
+  assert.match(G.tickHabit(b, { id: 'h-morning' }, {}).text, /has to be earned with its own result, so the routine is not finished/)
+  assert.equal(b.routineLog.length, 0)
+  // a routine with no steps keeps a hand-tickable streak habit
+  assert.match(G.tickHabit(b, { id: 'h-sun' }, {}).text, /^Kept "Sunday reset"/)
+}
+{
+  // un-finishing, exact rows and burials, through every door
+  const mk = () => { const f = growth(); G.routineStep(f, { id: 'r-ev' }, { stepId: 's1' }); G.routineStep(f, { id: 'r-ev' }, { stepId: 's2' }); return f }
+  const f = mk(); assert.equal(f.habitLog.length, 3); assert.equal(f.stepTicks.length, 2)
+  G.routineStep(f, { id: 'r-ev' }, { stepId: 's2' }, { done: false })
+  assert.deepEqual(f.habitLog.map((x) => x.habitId), ['h-r-ev-s1'], 'only the open step\'s sibling is still kept')
+  assert.deepEqual(M.shrinkAllowance(f), { habitLog: 1 }); assert.equal(f.stepTicks.length, 1)
+  for (const k of [`habitLog:h-r-ev-s2|${T}|r-ev:s2#0`, `habitLog:h-evening|${T}|`, `routineLog:r-ev|${T}|0|${T}`, `stepTicks:r-ev|s2|${T}`]) assert.equal(buried(f, k), true, k)
+  noDupKeys(f)
+  // the same through the habit's own checkbox, and through routine_done
+  const g1 = mk(); G.tickHabit(g1, { id: 'h-r-ev-s1' }, { done: false }); assert.deepEqual(g1.habitLog.map((x) => x.habitId), ['h-r-ev-s2']); assert.deepEqual(M.shrinkAllowance(g1), { habitLog: 1 })
+  const g2 = mk(); G.routineDone(g2, { id: 'r-ev' }, false); assert.equal(g2.habitLog.length, 0); assert.deepEqual(M.shrinkAllowance(g2), { habitLog: 2, stepTicks: 1 }, '3 rows leave habitLog, 2 leave stepTicks, 1 each is free')
+  // un-finishing never touches another routine's rows
+  const other = mk(); G.routineStep(other, { id: 'r-wind' }, { stepId: 'w1' }); const n0 = other.stepTicks.length
+  G.routineDone(other, { id: 'r-ev' }, false)
+  assert.equal(other.stepTicks.length, n0 - 2); assert.ok(other.stepTicks.some((x) => x.routineId === 'r-wind')); assert.equal(other.routines.find((x) => x.id === 'r-wind').doneStepIds.length, 1)
+  // a past-day correction of the routine's own habit removes the routine's record of that day (2 rows) with a declared allowance
+  const past = growth(); G.tickHabit(past, { id: 'h-evening' }, { day: D(-1) }); G.tickHabit(past, { id: 'h-evening' }, { day: D(-1), done: false })
+  assert.equal(past.habitLog.length + past.routineLog.length, 0)
+}
+{
+  // alternatives
+  const b = growth()
+  refuses(() => G.routineStep(b, { id: 'r-mo' }, { stepId: 'mr5' }), /which one is his to say.*a1 \(Move\), a2 \(Caffeine\)/)
+  refuses(() => G.tickHabit(b, { id: 'h-r-mo-mr5' }, {}), /which one is his to say.*a1 \(Move\)/)
+  G.routineDone(b, { id: 'r-mo' }, true)   // claims the alternatives step without a choice
+  assert.equal(b.routines.find((x) => x.id === 'r-mo').stepChoice && Object.keys(b.routines.find((x) => x.id === 'r-mo').stepChoice).length, 0)
+  assert.match(G.routineStep(b, { id: 'r-mo' }, { stepId: 'mr5' }, { done: false }).text, /Unticked in "Morning": Move or caffeine/)
+  const c = growth(); G.routineStep(c, { id: 'r-mo' }, { stepId: 'mr5' }, { alt: 'move' })
+  assert.deepEqual(c.routines.find((x) => x.id === 'r-mo').stepChoice, { mr5: 'a1' })
+  assert.match(G.routineStep(c, { id: 'r-mo' }, { stepId: 'mr5' }, { done: false }).text, /Unticked in "Morning": Move or caffeine \(Move\)/)
+  assert.deepEqual(c.routines.find((x) => x.id === 'r-mo').stepChoice, {}, 'the chosen one is cleared')
+  const d = growth(); G.tickHabit(d, { id: 'h-alt' }, { alt: 'cook' }); assert.match(G.tickHabit(d, { id: 'h-alt' }, { done: false }).text, /Took back "Cook"/); assert.equal(d.habitLog.length, 0)
+  assert.match(G.tickHabit(d, { id: 'h-alt' }, { done: false }).text, /was not kept/)
+}
+{
+  // bulk: all or nothing, in order, each exactly one tick
+  const b = growth()
+  const out = G.tickHabits(b, [{ id: 'h-stretch' }, { title: 'read', day: D(-1) }, { id: 'h-r-ev-s1' }, { id: 'h-alt', alt: 'order' }])
+  assert.match(out.text, /^4 done together:/); assert.equal(b.habitLog.length, 4)
+  refuses(() => G.tickHabits(b, []), /at least one/)
+  refuses(() => G.tickHabits(b, Array(41).fill({ id: 'h-stretch' })), /At most 40/)
+  const before = JSON.stringify(b)
+  const c = clone(b)
+  refuses(() => G.tickHabits(c, [{ id: 'h-review' }, { id: 'h-quit' }]), /Item 2 \(h-quit\): .*quit habit.*Nothing was changed/)
+  // (commit() writes nothing when the function throws; the registry test below asserts the stored state is untouched)
+  assert.equal(JSON.stringify(b), before)
+}
+{
+  // edit_habit: kinds, look, limits, the locked routine habit
+  const b = growth()
+  G.editHabit(b, { id: 'h-stretch' }, { kind: 'quit', quitSince: D(-3) })
+  assert.deepEqual([hrow(b, 'h-stretch').kind, hrow(b, 'h-stretch').quitSince, 'startedOn' in hrow(b, 'h-stretch'), 'daypart' in hrow(b, 'h-stretch')], ['break', D(-3), false, false])
+  G.editHabit(b, { id: 'h-stretch' }, { kind: 'count', countTarget: 3, countPer: 'week' })
+  const st = hrow(b, 'h-stretch'); assert.deepEqual([st.kind, st.measure, st.per, st.targetCount, 'quitSince' in st], ['measured', 'times', 'week', 3, false])
+  G.editHabit(b, { id: 'h-stretch' }, { kind: 'minutes', minutesTarget: 45 })
+  assert.deepEqual([st.measure, st.source, st.dailyTargetMin, 'targetCount' in st, 'per' in st], ['minutes', 'focus', 45, false, false]); assert.equal(G.trackOf(st), 'auto')
+  G.editHabit(b, { id: 'h-stretch' }, { minutesTarget: 90 }); assert.equal(st.dailyTargetMin, 90)
+  G.editHabit(b, { id: 'h-stretch' }, { kind: 'keep' }); assert.deepEqual([st.kind, 'measure' in st, 'source' in st, 'dailyTargetMin' in st], ['build', false, false, false])
+  refuses(() => G.editHabit(b, { id: 'h-stretch' }, { kind: 'keep' }), /Nothing to change/) // already a plain tick habit
+  refuses(() => G.editHabit(b, { id: 'h-water' }, { kind: 'keep' }), /amount habit.*no amount kind/)
+  refuses(() => G.editHabit(b, { id: 'h-evening' }, { kind: 'quit' }), /streak of the routine "Evening"/)
+  refuses(() => G.editHabit(b, { id: 'h-evening' }, { startedOn: D(-3) }), /follows the routine/)
+  assert.match(G.editHabit(b, { id: 'h-evening' }, { color: '#F87171', icon: 'moon' === 'x' ? 'x' : 'sun' }).text, /colour #F87171, icon sun/, 'the look of a routine habit is still his')
+  refuses(() => G.editHabit(b, { id: 'h-read' }, { color: '#123456' }), /swatches/); refuses(() => G.editHabit(b, { id: 'h-read' }, { icon: 'rocket' }), /icon must be one of/)
+  refuses(() => G.editHabit(b, { id: 'h-read' }, { presets: [5] }), /not an amount habit/); refuses(() => G.editHabit(b, { id: 'h-water' }, { presets: [5, -1] }), /above 0/)
+  refuses(() => G.editHabit(b, { id: 'h-walk' }, { countTarget: 100 }), /1 to 99/); refuses(() => G.editHabit(b, { id: 'h-read' }, { minutesTarget: 30 }), /not kept by focus minutes/)
+  refuses(() => G.editHabit(b, { id: 'h-focus' }, { minutesTarget: 4 }), /5 to 600/)
+  assert.match(G.editHabit(b, { id: 'h-water' }, { presets: [] }).text, /quick amounts none/); assert.deepEqual(hrow(b, 'h-water').presets, [])
+  G.editHabit(b, { id: 'h-quit' }, { dailyCost: null }); assert.equal('dailyCost' in hrow(b, 'h-quit'), false)
+  refuses(() => G.editHabit(b, { id: 'h-quit' }, { startedOn: D(-1) }), /runs from quit_since/)
+  G.editHabit(b, { id: 'h-quit' }, { quitSince: D(-1000) }); assert.equal(hrow(b, 'h-quit').quitSince, D(-1000), 'no 366-day limit on a quit date either')
+  refuses(() => G.editHabit(b, { id: 'h-quit' }, { quitSince: '1999-12-31' }), /typo/)
+}
+{
+  // add_habit / add_routine extras
+  const b = growth()
+  const m = hrow(b, G.addHabit(b, { name: 'Deep 2', track: 'minutes' }).id); assert.deepEqual([m.kind, m.measure, m.source, m.dailyTargetMin], ['measured', 'minutes', 'focus', 60], 'the sheet\'s own default is an hour')
+  refuses(() => G.addHabit(b, { name: 'D3', track: 'minutes', minutesTarget: 700 }), /5 to 600/); refuses(() => G.addHabit(b, { name: 'D4', minutesTarget: 30 }), /only applies to track "minutes"/)
+  refuses(() => G.addHabit(b, { name: 'D5', track: 'minutes', unit: 'x' }), /does not apply to a habit kept by focus minutes/)
+  assert.deepEqual([hrow(b, G.addHabit(b, { name: 'Col', color: '#a3e635', icon: 'cup' }).id)].map((h) => [h.color, h.icon])[0], ['#A3E635', 'cup'])
+  refuses(() => G.addHabit(b, { name: 'Col2', color: 'red' }), /swatches/)
+  refuses(() => G.addRoutine(b, { title: 'Weekly one', cadence: 'weekly', repeatable: true }), /repeatable.*daily/)
+  const rr = G.addRoutine(b, { title: 'Reset', repeatable: true, color: '#38BDF8', icon: 'bolt' }); const rrow = b.routines.find((x) => x.id === rr.id)
+  assert.deepEqual([rrow.repeatable, rrow.color, rrow.icon, rrow.steps.length], [true, '#38BDF8', 'bolt', 0])
+  refuses(() => G.addRoutine(b, { title: 'Bad look', icon: 'x' }), /icon must be/)
+  G.editRoutine(b, { id: rr.id }, { color: '#f472b6', icon: 'eye' }); assert.deepEqual([rrow.color, rrow.icon], ['#F472B6', 'eye'])
+  const ls = G.listRoutines(b).routines.find((x) => x.id === rr.id); assert.deepEqual([ls.color, ls.icon, ls.repeatable], ['#F472B6', 'eye', true])
+  const lh = G.listHabits(b).habits.find((x) => x.name === 'Col'); assert.deepEqual([lh.color, lh.icon], ['#A3E635', 'cup'])
+  // a new step is a habit in the folder, numbered after the others
+  const e = growth(); const before = e.habits.filter((h) => h.folderId === 'r-ev').length
+  G.addRoutineStep(e, { id: 'r-ev' }, 'Lay out clothes')
+  const made = e.habits.filter((h) => h.folderId === 'r-ev').at(-1); assert.equal(e.habits.filter((h) => h.folderId === 'r-ev').length, before + 1); assert.equal(made.folderOrder, 4, 'after the highest order (3)')
+  assert.equal(e.routines.find((x) => x.id === 'r-ev').steps.at(-1).id, made.id.replace('h-r-ev-', ''))
+}
+{
+  // the daily review
+  const b = growth(); const y = D(-1)
+  const out = G.routineDone(b, { id: 'r-ev' }, true, y)
+  assert.match(out.text, /Marked "Evening" as finished on .*2 step habits and the routine's own streak day/)
+  assert.deepEqual(b.habitLog.map((x) => `${x.habitId}@${x.day}`).sort(), [`h-evening@${y}`, `h-r-ev-s1@${y}`, `h-r-ev-s2@${y}`].sort(), 'the optional step is not claimed')
+  assert.deepEqual(b.routineLog, [{ routineId: 'r-ev', day: y, periodKey: y, run: 0 }])
+  assert.equal(b.routines.find((x) => x.id === 'r-ev').doneStepIds.length, 0, 'today\'s card is untouched'); noDupKeys(b)
+  assert.match(G.routineDone(b, { id: 'r-ev' }, true, y).text, /Marked/, 'again: nothing is duplicated'); noDupKeys(b); assert.equal(b.habitLog.length, 3)
+  refuses(() => G.routineDone(b, { id: 'r-ev' }, true, D(1)), /has not happened yet/); refuses(() => G.routineDone(b, { id: 'r-ev' }, false, y), /no "reopen a past day"/); refuses(() => G.routineDone(b, { id: 'r-ev' }, true, 'x'), /YYYY-MM-DD/)
+  assert.equal(G.routineDone(growth(), { id: 'r-wind' }, true, T).text.startsWith('Ticked what'), true, 'day = today is the ordinary routine_done')
+  // close the review
+  const c = growth(); assert.match(G.closeDaily(c, true).text, /walked/); assert.equal(c.dailyDone, T); assert.equal(c.dailySkipped, undefined)
+  G.closeDaily(c, false); assert.equal(c.dailySkipped, T)
+}
+{
+  // cascade guard: an operation that removes a row outside its routine is refused before anything is written
+  // (the mutation check in section 5 proves this is the check that stops it)
+  const b = growth(); G.routineStep(b, { id: 'r-wind' }, { stepId: 'w1' }); G.routineStep(b, { id: 'r-ev' }, { stepId: 's1' })
+  assert.equal(b.stepTicks.length, 2)
+}
+
 console.log('growth: rules ok')
 
 /* ============================================================================ */
@@ -905,6 +1249,57 @@ const has = (m, f, key) => (m[f] ?? []).some((r) => G.logKey(f, r) === key)
   const m = merged(a, c)
   assert.equal(m.routineLog.length, 1, 'one finish'); assert.equal(m.stepTicks.length, 2); assert.equal(m.habitLog.filter((x) => x.habitId === 'h-wind').length, 1)
 }
+{
+  // un-finishing a routine: every record of the finish stays gone against a stale copy that still holds them
+  const stale = growth(); G.routineStep(stale, { id: 'r-ev' }, { stepId: 's1' }); G.routineStep(stale, { id: 'r-ev' }, { stepId: 's2' })
+  tick(); const mine = stamp(clone(stale)); G.routineStep(mine, { id: 'r-ev' }, { stepId: 's2' }, { done: false })
+  const m = merged(stale, mine)
+  assert.equal(m.routineLog.length, 0, 'the finish stays gone'); assert.equal(m.habitLog.some((x) => x.habitId === 'h-evening'), false, 'and the streak day')
+  assert.equal(m.habitLog.some((x) => x.habitId === 'h-r-ev-s2'), false, 'and the step row'); assert.deepEqual(m.stepTicks.map((x) => x.stepId), ['s1'])
+  assert.deepEqual(m.habitLog.map((x) => x.habitId), ['h-r-ev-s1'])
+  // routine_done false of a half-done routine, same story
+  const st2 = growth(); G.routineStep(st2, { id: 'r-mo' }, { stepId: 'mr5' }, { alt: 'a1' }); G.routineStep(st2, { id: 'r-mo' }, { stepId: 'mr6' })
+  tick(); const mine2 = stamp(clone(st2)); G.routineDone(mine2, { id: 'r-mo' }, false)
+  const m2 = merged(st2, mine2); assert.equal(m2.habitLog.length, 0); assert.equal(m2.stepTicks.length, 0); assert.deepEqual(m2.routines.find((x) => x.id === 'r-mo').doneStepIds, [])
+}
+{
+  // deleting a routine whose habit a goal counts off: the detached goal and the archive survive a stale copy
+  const stale = growth(); stale.goals = [{ id: 'g1', space: 'personal', name: 'Evenings', habitId: 'h-evening', current: 2, target: 10, unit: 'checkoffs', timeframe: 'quarter' }]
+  tick(); const mine = stamp(clone(stale)); G.deleteRoutine(mine, { id: 'r-ev' })
+  const m = merged(stale, mine)
+  assert.equal(m.routines.find((x) => x.id === 'r-ev').archivedAt, T); assert.equal(m.habits.find((x) => x.id === 'h-evening').archivedAt, T)
+  assert.equal(m.goals[0].habitId, undefined, 'the goal stays detached'); assert.equal(m.goals[0].unit, 'done'); assert.ok(m.removedSeeds.includes('r-ev'))
+}
+{
+  // a paused habit ticked, bulk ticks, a daily-review finish and the closed review all survive a stale copy
+  const stale = growth(); hrow(stale, 'h-stretch').paused = true
+  tick(); const mine = stamp(clone(stale))
+  G.tickHabits(mine, [{ id: 'h-stretch' }, { id: 'h-read', day: D(-1) }]); G.routineDone(mine, { id: 'r-ev' }, true, D(-1)); G.closeDaily(mine, true)
+  const m = merged(stale, mine)
+  assert.ok(m.habitLog.some((x) => x.habitId === 'h-stretch' && x.day === T)); assert.ok(m.habitLog.some((x) => x.habitId === 'h-read' && x.day === D(-1)))
+  assert.equal(m.routineLog.filter((x) => x.routineId === 'r-ev' && x.day === D(-1)).length, 1); assert.equal(m.habitLog.filter((x) => x.habitId === 'h-evening').length, 1)
+  assert.equal(m.dailyDone, T)
+  noDupKeys(m)
+}
+{
+  // a multi-year backfill: the days survive, nothing is duplicated, and old tombstones are NOT pushed out of the graveyard
+  const stale = growth()
+  for (let k = 0; k < 600; k++) stale.graveyard.push({ k: `tasks:old${k}`, at: 1000 + k }) // 600 genuine tombstones
+  tick(); const mine = stamp(clone(stale)); const r = G.addHabit(mine, { name: 'Years', startedOn: D(-1000) })
+  assert.equal(mine.habitLog.filter((x) => x.habitId === r.id).length, 1000)
+  assert.equal(mine.graveyard.filter((x) => /^tasks:old/.test(x.k)).length, 600, 'every old tombstone is still there')
+  const m = merged(stale, mine)
+  assert.equal(m.habitLog.filter((x) => x.habitId === r.id).length, 1000); noDupKeys(m)
+}
+{
+  // a cascade removal against a deleted-then-restored world: a step row removed here is not handed back by the other device, and a re-tick later is
+  const stale = growth(); G.routineStep(stale, { id: 'r-ev' }, { stepId: 's1' }); G.routineStep(stale, { id: 'r-ev' }, { stepId: 's2' })
+  tick(); const gone = stamp(clone(stale)); G.routineDone(gone, { id: 'r-ev' }, false)
+  tick(); const again = stamp(clone(gone)); G.routineDone(again, { id: 'r-ev' }, true)
+  const m = merged(gone, again); assert.equal(m.routineLog.length, 1); assert.equal(m.habitLog.filter((x) => /^h-(evening|r-ev-s[12])$/.test(x.habitId)).length, 3, 'finished again: the dug-up keys beat the older tombstones')
+  assert.equal(merged(stale, gone).habitLog.length, 0)
+}
+
 console.log('growth: merge ok')
 
 /* ============================================================================ */
@@ -914,7 +1309,7 @@ console.log('growth: merge ok')
   const db = stateDb(growth())
   const srv = fakeServer(K, M.tools_growth.register, db)
   const names = srv.names()
-  assert.equal(names.length, 20, names.join())
+  assert.equal(names.length, 22, names.join())
   assert.equal(new Set(names).size, names.length)
   for (const n of names) { const c = srv.tools[n].cfg; assert.ok(c.title && c.description && c.inputSchema && c.annotations, `${n} is fully described`); assert.match(n, /^[a-z]+(_[a-z]+)*$/, `${n} is snake_case`) }
   assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.readOnlyHint).sort(), ['list_habits', 'list_routines'])
@@ -939,20 +1334,26 @@ console.log('growth: merge ok')
   for (const [tool, args, re] of [
     ['tick_habit', { id: 'h-quit' }, /quit habit/], ['tick_habit', { title: 'e' }, /matches \d+ habits/], ['habit_count', { id: 'h-stretch', value: 1 }, /not counted/],
     ['log_slip', { id: 'h-stretch' }, /No quit habit/], ['routine_step', { id: 'r-mo', step_id: 'mr4' }, /locked/], ['delete_routine', { id: 'zzz' }, /No routine has the id/],
-    ['archive_habit', { id: 'h-evening' }, /streak of the routine/], ['plan_routine', { id: 'r-ev' }, /Say where/], ['add_habit', { name: 'stretch' }, /already a habit/],
+    ['archive_habit', { id: 'h-nope' }, /No habit has the id/], ['plan_routine', { id: 'r-ev' }, /Say where/], ['add_habit', { name: 'stretch' }, /already a habit/],
   ]) {
     const r = await srv.call(tool, args); assert.equal(r.isError, true, `${tool} refuses`); assert.match(r.text, re)
     assert.equal(JSON.stringify(state()), snap, `${tool}: a refusal changes nothing`)
   }
-  // the safety stop gives a reason, and writes nothing
+  // LIFTED: un-finishing a routine removes several records, which the writer lets through because the operation declared the cascade
   await srv.call('routine_step', { id: 'r-ev', step_id: 's1' }); await srv.call('routine_step', { id: 'r-ev', step_id: 's2' })
   assert.equal(state().routines.find((r) => r.id === 'r-ev').completedOn, T)
+  assert.equal(state().routineLog.length, 1)
+  const unf = await srv.call('routine_step', { id: 'r-ev', step_id: 's1', done: false })
+  assert.equal(unf.isError, false, unf.text); assert.match(unf.text, /Unticked in "Evening": Brush teeth/)
+  assert.equal(state().routines.find((r) => r.id === 'r-ev').completedOn, null); assert.equal(state().routineLog.length, 0)
+  assert.equal(state().habitLog.some((x) => x.habitId === 'h-evening' || x.habitId === 'h-r-ev-s1'), false, 'the step row and the routine streak row are both gone')
+  assert.equal(state().graveyard.some((x) => x.k === `habitLog:h-evening|${T}|` && !x.undone), true, 'and buried')
+  assert.equal(JSON.stringify(state()).includes('allowShrink'), false, 'the declaration never reaches the saved JSON')
+  await srv.call('routine_step', { id: 'r-ev', step_id: 's1' })
+  const reopen = await srv.call('routine_done', { id: 'r-ev', done: false })
+  assert.equal(reopen.isError, false, reopen.text); assert.match(reopen.text, /Reopened "Evening"/)
+  assert.equal(state().stepTicks.filter((x) => x.routineId === 'r-ev').length, 0); assert.equal(state().habitLog.filter((x) => /^h-(r-ev|evening)/.test(x.habitId)).length, 0)
   snap = JSON.stringify(state())
-  const stop = await srv.call('routine_step', { id: 'r-ev', step_id: 's1', done: false })
-  assert.equal(stop.isError, true); assert.match(stop.text, /at once.*at a time/); assert.doesNotMatch(stop.text, /Safety stop/)
-  assert.equal(JSON.stringify(state()), snap)
-  const stop2 = await srv.call('routine_done', { id: 'r-ev', done: false })
-  assert.equal(stop2.isError, true); assert.match(stop2.text, /at once/)
   // every write tool end to end
   assert.match((await srv.call('habit_count', { title: 'walk', value: 2 })).text, /Counted 2/)
   assert.match((await srv.call('habit_count', { title: 'walk', value: -1 })).text, /Took one off/)
@@ -994,4 +1395,89 @@ console.log('growth: merge ok')
   assert.equal(t2.isError, false)
   assert.deepEqual(db2.tables.mc_state[0].data.habitLog.map((x) => x.habitId).sort(), ['h-read', 'h-stretch'], 'the other device\'s tick survives, mine lands on top')
 }
+
+/* ============================================================================ */
+/* 5. THE NEW TOOLS through registration + real zod + real commit()              */
+/* ============================================================================ */
+{
+  const start = growth()
+  start.goals = [{ id: 'g1', space: 'personal', name: 'Evenings', habitId: 'h-evening', current: 2, target: 10, unit: 'checkoffs', timeframe: 'quarter' }]
+  const db = stateDb(start); const srv = fakeServer(K, M.tools_growth.register, db); const state = () => db.tables.mc_state[0].data
+  // bulk tick: through zod, one commit, all or nothing
+  const ok = await srv.call('tick_habits', { habits: [{ id: 'h-stretch' }, { title: 'read', day: D(-1) }, { id: 'h-r-ev-s1' }] })
+  assert.equal(ok.isError, false, ok.text); assert.match(ok.text, /3 done together/); assert.equal(state().habitLog.length, 3)
+  const snap = JSON.stringify(state())
+  const bad = await srv.call('tick_habits', { habits: [{ id: 'h-review' }, { id: 'h-walk' }] })
+  assert.equal(bad.isError, true); assert.match(bad.text, /Item 2 \(h-walk\).*counted habit.*Nothing was changed/); assert.equal(JSON.stringify(state()), snap, 'not even the first item was written')
+  // a paused habit, the daily review, a past-day routine finish
+  assert.equal((await srv.call('pause_habit', { id: 'h-read', paused: true })).isError, false)
+  assert.match((await srv.call('tick_habit', { id: 'h-read' })).text, /Kept "Read" on/)
+  assert.match((await srv.call('close_daily_review', { walked: true })).text, /walked/); assert.equal(state().dailyDone, T)
+  assert.match((await srv.call('close_daily_review', { walked: false })).text, /skipped/); assert.equal(state().dailySkipped, T)
+  assert.match((await srv.call('routine_done', { id: 'r-wind', day: D(-2) })).text, /Marked "Wind down" as finished on/)
+  // the minutes habit and the colour, through zod
+  assert.match((await srv.call('add_habit', { name: 'Deep 2', track: 'minutes', minutes_target: 45, color: '#38BDF8', icon: 'focus' })).text, /Added a habit: "Deep 2"/)
+  const dh = state().habits.find((h) => h.name === 'Deep 2'); assert.deepEqual([dh.measure, dh.dailyTargetMin, dh.color, dh.icon], ['minutes', 45, '#38BDF8', 'focus'])
+  assert.match((await srv.call('edit_habit', { id: 'h-stretch', kind: 'count', count_target: 2, color: '#A78BFA', icon: 'heart' })).text, /now a counted habit/)
+  assert.match((await srv.call('edit_habit', { id: 'h-water', presets: [100, 200] })).text, /quick amounts 100, 200/)
+  assert.match((await srv.call('edit_habit', { id: 'h-quit', daily_cost: null })).text, /no daily cost/)
+  assert.match((await srv.call('edit_routine', { id: 'r-wind', color: '#34D399', icon: 'bulb' })).text, /colour #34D399, icon bulb/)
+  const ar = await srv.call('add_routine', { title: 'Lunch', daypart: 'noon', steps: ['Walk', 'Eat'], repeatable: true, color: '#FB923C', icon: 'sun' }); assert.match(ar.text, /2 steps, each one a habit in its folder/)
+  assert.match((await srv.call('add_routine_step', { title: 'lunch', step: 'Stretch' })).text, /Added a step/)
+  assert.equal(state().habits.filter((h) => h.folderId === state().routines.find((r) => r.title === 'Lunch').id).length, 3)
+  // archiving a routine's streak habit deletes the routine and detaches the goal that counted off it
+  const ahr = await srv.call('archive_habit', { id: 'h-evening' }); assert.equal(ahr.isError, false, ahr.text); assert.match(ahr.text, /Deleted routine "Evening".*"Evenings" counted off its habit/)
+  assert.equal(state().routines.find((r) => r.id === 'r-ev').archivedAt, T); assert.equal(state().goals[0].habitId, undefined); assert.equal(state().goals[0].unit, 'done')
+  noDupKeys(state())
+  // a lifted refusal that used to be one still refuses what the app refuses
+  for (const [tool, args, re] of [
+    ['tick_habit', { id: 'h-focus' }, /kept by the clock/], ['tick_habit', { id: 'h-alt' }, /which one is his to say/], ['routine_step', { id: 'r-mo', step_id: 'mr5' }, /which one is his to say/],
+    ['routine_step', { id: 'r-mo', step_id: 'mr4' }, /locked/], ['edit_habit', { id: 'h-water', kind: 'keep' }, /amount habit/], ['routine_done', { id: 'r-wind', day: D(-1), done: false }, /no "reopen a past day"/],
+    ['add_habit', { name: 'Old', started_on: '1999-01-01' }, /typo/],
+  ]) { const r = await srv.call(tool, args); assert.equal(r.isError, true, `${tool} ${JSON.stringify(args)}`); assert.match(r.text, re) }
+  if (K.zodReal) {
+    for (const [tool, args] of [
+      ['edit_habit', { id: 'h-read', color: '#123456' }], ['edit_habit', { id: 'h-read', icon: 'rocket' }], ['edit_habit', { id: 'h-read', kind: 'amount' }], ['edit_habit', { id: 'h-walk', count_target: 100 }],
+      ['edit_habit', { id: 'h-focus', minutes_target: 4 }], ['add_habit', { name: 'x', track: 'minutes', minutes_target: 601 }], ['add_habit', { name: 'x', color: 'red' }], ['add_routine', { title: 'x', icon: 'rocket' }],
+      ['tick_habits', { habits: [] }], ['tick_habits', { habits: Array(41).fill({ id: 'h-read' }) }], ['tick_habits', {}], ['close_daily_review', {}], ['close_daily_review', { walked: 'yes' }], ['routine_done', { id: 'r-ev', day: 5 }],
+    ]) await assert.rejects(() => srv.call(tool, args), undefined, `${tool} ${JSON.stringify(args)} is rejected by the schema`)
+  }
+}
+
+/* ============================================================================ */
+/* 6. MUTATION CHECKS on the riskiest rule: the cascade (declaration + scope)     */
+/* ============================================================================ */
+async function loadMutant(patches) {
+  const FN = `${ROOT}/supabase/functions/mc-mcp`
+  const out = await build({
+    stdin: { contents: `export * from '${FN}/ops.ts'\nexport * from '${FN}/commit.ts'\nexport * as growth from '${FN}/ops-growth.ts'`, resolveDir: ROOT, loader: 'ts' },
+    bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'error',
+    plugins: [{ name: 'mutate', setup(b) { b.onLoad({ filter: /ops-growth\.ts$/ }, (a) => { let src = readFileSync(a.path, 'utf8'); for (const [from, to] of patches) { assert.ok(src.includes(from), `mutation anchor not found: ${from}`); src = src.replace(from, to) } return { contents: src, loader: 'ts' } }) } }],
+  })
+  return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`)
+}
+{
+  const finishedDb = () => { const f = growth(); G.routineStep(f, { id: 'r-ev' }, { stepId: 's1' }); G.routineStep(f, { id: 'r-ev' }, { stepId: 's2' }); return stateDb(f) }
+  const untick = (X, db) => X.commit(db, 'u1', (b) => X.growth.routineStep(b, { id: 'r-ev' }, { stepId: 's1' }, { done: false }))
+  const DECLARE = 'allowShrink(b, k, Math.max(0, rows.length - now.length - 1))'
+  // control: the unmutated source passes through the real writer
+  const ctl = await loadMutant([]); { const db = finishedDb(); await untick(ctl, db); assert.equal(db.tables.mc_state[0].data.routineLog.length, 0) }
+  // M1: the cascade is NOT declared -> the writer's safety stop refuses the same untick, and nothing is written
+  const m1 = await loadMutant([[DECLARE, 'void 0']])
+  { const db = finishedDb(); const before = JSON.stringify(db.tables.mc_state[0].data); await assert.rejects(() => untick(m1, db), (e) => /Safety stop: "habitLog" would have shrunk/.test(e.message)); assert.equal(JSON.stringify(db.tables.mc_state[0].data), before, 'nothing written') }
+  // M2: over-declared by one -> the exact allowance assertion catches it
+  const m2 = await loadMutant([[DECLARE, 'allowShrink(b, k, rows.length - now.length)']])
+  { const f = growth(); G.routineStep(f, { id: 'r-ev' }, { stepId: 's1' }); G.routineStep(f, { id: 'r-ev' }, { stepId: 's2' }); m2.growth.routineStep(f, { id: 'r-ev' }, { stepId: 's1' }, { done: false }); assert.notDeepEqual(M.shrinkAllowance(f), { habitLog: 1 }, 'the mutant over-declares'); assert.deepEqual(M.shrinkAllowance(f), { habitLog: 2, routineLog: 1, stepTicks: 1 }, 'which the exact-allowance assertions in section 2 would fail on') }
+  // M3: a bug that wipes ANOTHER routine's step ticks while ticking: the scope check refuses; with the scope check disabled the same bug sails through
+  const BUG = [["const rest = arr(b, 'stepTicks').filter((t) => !(t.routineId === routineId && t.day === day && stepIds.includes(t.stepId)))", "const rest = arr(b, 'stepTicks').filter((t) => t.routineId === routineId && !(t.day === day && stepIds.includes(t.stepId)))"]]
+  const twoRoutines = () => { const f = growth(); G.routineStep(f, { id: 'r-wind' }, { stepId: 'w1' }); G.routineStep(f, { id: 'r-ev' }, { stepId: 's1' }); return stateDb(f) }
+  const bug = await loadMutant(BUG)
+  { const db = twoRoutines(); await assert.rejects(() => bug.commit(db, 'u1', (b) => bug.growth.routineStep(b, { id: 'r-ev' }, { stepId: 's1' }, { done: false })), (e) => /should not touch/.test(e.message)); assert.equal(db.tables.mc_state[0].data.stepTicks.length, 2, 'nothing written') }
+  const bugNoGuard = await loadMutant([...BUG, ['if (!inScope || lost.some((r) => !inScope(r))) {', 'if (false) {']])
+  { const db = twoRoutines(); await bugNoGuard.commit(db, 'u1', (b) => bugNoGuard.growth.routineStep(b, { id: 'r-ev' }, { stepId: 's1' }, { done: false })); assert.equal(db.tables.mc_state[0].data.stepTicks.length, 0, 'without the scope check the other routine\'s tick is silently lost') }
+  // M4: the goal is not detached on delete -> the assertions of section 2 (current 5, no habitId) fail
+  const m4 = await loadMutant([['      g.current = goalCurrentPlain(g, habits)\n      delete g.habitId', '      g.current = g.current']])
+  { const f = growth(); f.goals = [{ id: 'g1', name: 'E', habitId: 'h-evening', current: 2, target: 10, unit: 'checkoffs' }]; m4.growth.deleteRoutine(f, { id: 'r-ev' }); assert.equal(f.goals[0].habitId, 'h-evening', 'the mutant leaves the goal pointing at an archived habit: the section-2 assertions fail on it') }
+}
+
 console.log(`MCP growth: all checks passed (${K.zodReal ? 'schemas validated with zod' : 'schemas NOT validated'}).`)

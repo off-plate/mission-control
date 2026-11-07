@@ -21,7 +21,7 @@ rows. The library's service-role client is never used.
 
 ## Areas (101 tools)
 - core: overview, day, tasks (add, change, finish, reopen, steps, delete), projects, notes (add, append, rewrite, tick, delete), browse
-- growth: habits (every kind), routines, quit habits and slips, amounts/counts
+- growth: habits (every kind, bulk tick, kind/look/target edits), routines (steps, un-finish, past-day finish, delete with goals), quit habits and slips, amounts/counts, the daily review marker
 - goals: goals, progress, milestones, repeat, tasks feeding goals, delete project, project tag/colour
 - people: people, links between people, contact log (log, correct, remove), and the full Business pipeline (add/edit/delete prospects, notes, links, next step, finished clients, contacts, touches, replies, meeting prep)
 - money: this cycle's bills, debts, transactions; mark paid, skip, expense, income (compass_* tables)

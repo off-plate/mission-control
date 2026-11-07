@@ -2,7 +2,7 @@ import { Orb } from './orb'
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store'
 import { useCalendar } from './calendar'
-import { SpaceMark, TaskMark } from './ui'
+import { SpaceMark, TagMark } from './ui'
 import { MORNING, SKILLS, type CardKind } from './assistant'
 import {
   cancel as cancelDictation, dictateState, dictationAvailable, dictationEngine,
@@ -17,7 +17,7 @@ import { TIER_LABEL } from './peoplelayout'
 import { SOURCES, STAGES, label } from './prospectcalc'
 import { ActualLog } from './plan'
 import * as Icon from './icons'
-import { Speak, useAssistantThread, useVoiceGlue, VoicePanel, type Done } from './assistantcore'
+import { Speak, dayRank, useAssistantThread, useVoiceGlue, VoicePanel, type Done } from './assistantcore'
 import type { JarvisCore, Job, Shape } from './jarviscore'
 import { speakingLevel, stop as stopSpeech } from './speech'
 import { voiceLevel } from './voicemode'
@@ -200,7 +200,7 @@ function WeatherCard(): JSX.Element {
   )
 }
 
-function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: number; touched?: string[] }) {
+function CardBody({ kind, limit, touched = [], onAsk }: { kind: CardKind; limit?: number; touched?: string[]; onAsk?: (text: string) => void }) {
   const {
     tasks, habits, habitLog, routines, focusSessions, goals, todayIndex, setPage, toggleTask, toggleHabitDay,
     projects, notes, noteFolders, people, ideaBoard, gymGoals, prompts, prospects,
@@ -208,6 +208,14 @@ function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: numbe
   const { state: cal } = useCalendar()
   const day = localDateKey()
   const hot = hotFor(touched)
+  /* A task's words, with its #project tag running inline at the start of them.
+     The tag used to be its own flex item beside the title, so a long tag
+     (#elizabethbackontrack) left the title a column of three letters. Inside
+     the title it wraps with the words and the title keeps the whole row. */
+  const taskTitle = (t: { title: string; projectId?: string }) => {
+    const pr = t.projectId ? projects.find((x) => x.id === t.projectId) : undefined
+    return <span className="as-row-title">{pr ? <><TagMark project={pr} />{' '}</> : null}{t.title}</span>
+  }
 
   if (kind === 'weather') return <WeatherCard />
   if (kind === 'bills') return <BillsCard hot={hot} limit={limit} />
@@ -227,8 +235,8 @@ function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: numbe
               <div className={rowCls(hot(t.id, t.title), t.done)} key={t.id} style={stagger(i)}>
                 <button className="checkbox" role="checkbox" aria-checked={!!t.done}
                   aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
-                <TaskMark task={t} always />
-                <span className="as-row-title">{t.title}</span>
+                <SpaceMark space={t.space} always />
+                {taskTitle(t)}
                 <span className="as-row-min mono">{t.at ?? (t.estimateMin > 0 ? fmtDuration(t.estimateMin) : '')}</span>
               </div>
             ))}
@@ -379,6 +387,9 @@ function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: numbe
     const groups = kind === 'today'
       ? SLOTS.map((s) => ({ label: s.label, items: rows.filter((t) => t.slot === s.id) }))
         .concat([{ label: 'Unsorted', items: rows.filter((t) => !t.slot) }]).filter((g) => g.items.length)
+        /* A plan reads top to bottom by the clock: a pinned time sorts ahead of
+           an unpinned one, earlier before later (the sheet had 15:30 under 16:45). */
+        .map((g) => ({ ...g, items: [...g.items].sort((a, b) => (a.at ?? '99:99').localeCompare(b.at ?? '99:99')) }))
       : [{ label: 'Oldest first', items: rows }]
     return (
       <div className="as-list">
@@ -389,8 +400,8 @@ function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: numbe
               <div className={rowCls(hot(t.id, t.title), t.done)} key={t.id} style={stagger(i)}>
                 <button className="checkbox" role="checkbox" aria-checked={!!t.done}
                   aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
-                <TaskMark task={t} always />
-                <span className="as-row-title">{t.title}</span>
+                <SpaceMark space={t.space} always />
+                {taskTitle(t)}
                 {t.estimateMin > 0 && <span className="as-row-min mono">{t.at ?? fmtDuration(t.estimateMin)}</span>}
               </div>
             ))}
@@ -414,8 +425,8 @@ function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: numbe
             <div className={rowCls(hot(t.id, t.title), t.done)} key={t.id} style={stagger(i)}>
               <button className="checkbox" role="checkbox" aria-checked={!!t.done}
                 aria-label={t.title} onClick={() => toggleTask(t.id)}><Tick /></button>
-              <TaskMark task={t} always />
-              <span className="as-row-title">{t.title}</span>
+              <SpaceMark space={t.space} always />
+              {taskTitle(t)}
               {t.carried ? <span className="as-row-min mono">back {t.carried}x</span> : null}
             </div>
           ))}
@@ -495,10 +506,22 @@ function CardBody({ kind, limit, touched = [] }: { kind: CardKind; limit?: numbe
 
   if (kind === 'focus') {
     const all = focusSessions.slice(-10).reverse()
-    if (!all.length) return <p className="as-empty">No blocks logged yet.</p>
     const week = limit ? all.slice(0, limit) : all
     return (
       <div className="as-list">
+        {/* A starter, not a log: talking about focus puts the way in right here.
+            It asks the assistant, so it starts the same real timer a spoken
+            "focus for 25 minutes" does. */}
+        {onAsk ? (
+          <div className="as-focus-start" role="group" aria-label="Start a focus block">
+            {[25, 50, 90].map((m) => (
+              <button className="as-focus-btn" key={m} onClick={() => onAsk(`Start a ${m} minute focus timer`)}>
+                <Icon.Waveform size={14} />{m} min
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {!all.length ? <p className="as-empty">No blocks logged yet.</p> : null}
         <div className="as-group">
           {week.map((f, i) => (
             <div className="as-row" key={i} style={stagger(i)}>
@@ -541,9 +564,86 @@ const TITLES: Record<CardKind, string> = {
   prompts: 'Prompts', business: 'Business',
 }
 
+/** The follow-ups he might ask: one row, however long they are. They scroll
+ *  sideways, the edge fades while there is more to reach, and the mouse wheel
+ *  scrolls the row (a plain wheel only moves a page up and down, so a chip off
+ *  the edge was out of reach with a mouse). */
+function Chips({ items, onPick }: { items: string[]; onPick: (text: string) => void }) {
+  const row = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = row.current
+    if (!el) return
+    const more = () => el.setAttribute('data-more', String(el.scrollLeft + el.clientWidth < el.scrollWidth - 2))
+    const wheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+    more()
+    el.addEventListener('scroll', more, { passive: true })
+    el.addEventListener('wheel', wheel, { passive: false })
+    const ro = new ResizeObserver(more)
+    ro.observe(el)
+    return () => { el.removeEventListener('scroll', more); el.removeEventListener('wheel', wheel); ro.disconnect() }
+  }, [items])
+  return (
+    <div className="as-next" ref={row} data-more="false">
+      {items.map((n, k) => <button className="as-chip" key={k} onClick={() => onPick(n)}>{n}</button>)}
+    </div>
+  )
+}
+
+/** What the last answer changed, on the right, where the day it changed is.
+ *  A summary line first (collapsed), because seven rows of "Moved to 16:00"
+ *  ate the chat's height; a change that did NOT apply is never hidden behind
+ *  the fold, since the failure has to be as visible as the success. */
+function Activity({ done, onUndo, onUndoAll, onLog }: {
+  done: Done[]
+  onUndo: (k: number) => void
+  onUndoAll: () => void
+  onLog: (k: number, taskId: string, minutes: number) => void
+}) {
+  /* A few changes are just shown; a batch folds to its summary line. Folding one
+     change behind a click hid the very thing he had just asked for. */
+  const [open, setOpen] = useState(done.length <= 3)
+  const failed = done.filter((d) => !d.ok).length
+  const live = done.filter((d) => d.undo && !d.undone).length
+  const rows = done.map((d, k) => ({ d, k })).filter(({ d }) => open || !d.ok || d.needsActual)
+  return (
+    <section className="as-act" aria-label="What changed">
+      <div className="as-act-bar">
+        <button className="as-act-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <Icon.ChevronDown size={14} className={open ? 'is-open' : ''} />
+          <span>{done.length} {done.length === 1 ? 'change' : 'changes'}{failed ? `, ${failed} did not apply` : ' applied'}</span>
+        </button>
+        {live > 1 ? <button className="btn btn-quiet as-did-undoall" onClick={onUndoAll}>Undo all</button> : null}
+      </div>
+      {rows.length ? (
+        <ul className="as-did as-act-list">
+          {rows.map(({ d, k }) => (
+            <li className={`${d.ok ? 'is-ok' : 'is-no'}${d.undone ? ' is-undone' : ''}`} key={k}>
+              {d.ok ? null : <span className="as-did-head">Nothing changed, </span>}
+              {d.text}
+              {d.undone ? <span className="as-did-undone">, reverted</span> : null}
+              {d.undo && !d.undone ? (
+                <button className="as-did-undo" onClick={() => onUndo(k)} title="Undo this one"><Icon.Rewind size={13} /> Undo</button>
+              ) : null}
+              {d.needsActual ? (
+                <ActualLog est={d.needsActual.est}
+                  onLog={(m) => onLog(k, d.needsActual!.taskId, m)}
+                  onSkip={() => onLog(k, d.needsActual!.taskId, d.needsActual!.est)} />
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  )
+}
+
 /** The canvas. One place, swapped, animated on the swap so the change is
  *  visible rather than a silent substitution while he is looking elsewhere. */
-function Canvas({ kinds, touched }: { kinds: CardKind[]; touched: string[] }) {
+function Canvas({ kinds, touched, onAsk, top }: { kinds: CardKind[]; touched: string[]; onAsk?: (text: string) => void; top?: React.ReactNode }) {
   const sig = kinds.join('+')
   const body = useRef<HTMLDivElement>(null)
   /* Bring the first changed row into view: a new task at the bottom of a
@@ -557,11 +657,12 @@ function Canvas({ kinds, touched }: { kinds: CardKind[]; touched: string[] }) {
       <header className="as-canvas-head">
         <h2 key={sig}>{kinds.map((k) => TITLES[k]).join(', ')}</h2>
       </header>
+      {top}
       <div className="as-canvas-body" key={sig} ref={body}>
         {kinds.map((k) => (
           <section className="as-pane" key={k}>
             {kinds.length > 1 && <h3 className="microcap as-pane-head">{TITLES[k]}</h3>}
-            <CardBody kind={k} touched={touched} />
+            <CardBody kind={k} touched={touched} onAsk={onAsk} />
           </section>
         ))}
       </div>
@@ -703,6 +804,16 @@ export function AssistantPage() {
      focus back to it is this component's business, not the thread's, so it
      wraps every call site here instead of living inside the shared hook. */
   const send = (text: string, shown?: string) => sendRaw(text, shown).then((r) => { box.current?.focus(); return r })
+  /* Which answer's changes the right panel shows: the latest one that changed
+     anything, unless he pointed at an older one from the thread. */
+  const [actTurn, setActTurn] = useState<number | null>(null)
+  const lastDone = (() => { for (let i = turns.length - 1; i >= 0; i--) if (turns[i].done?.length) return i; return -1 })()
+  const lastIt = (() => { for (let i = turns.length - 1; i >= 0; i--) if (turns[i].who === 'it') return i; return -1 })()
+  useEffect(() => { setActTurn(null) }, [turns.length])
+  /* Only while that answer is the current one: a focus card opened two answers
+     later must not carry "10 changes applied" from the day before it. He can
+     still bring an older answer's changes back from its line in the chat. */
+  const actIdx = actTurn ?? (lastDone === lastIt ? lastDone : -1)
 
   /* ---- the core ---- */
   const gl = useRef<HTMLCanvasElement>(null)
@@ -910,7 +1021,12 @@ export function AssistantPage() {
         )}
 
         <section className="as-chat jv-center">
-          <div className={`jv-stage${empty ? '' : ' is-talking'}`} ref={stage} aria-label="JARVIS. Drag to look around.">
+          {/* The core is the room's first thing and, once he is talking, its
+              smallest: it steps aside to the head of the column next to the name,
+              so the conversation gets the height (his report, 2026-11-07: "not even
+              a sentence from him"). */}
+          <div className={`jv-head${empty ? '' : ' is-talking'}`}>
+            <div className={`jv-stage${empty ? '' : ' is-talking'}`} ref={stage} aria-label="JARVIS. Drag to look around." />
             <div className="jv-presence"><span className="jv-name">JARVIS</span><span className="jv-state" role="status">{state}</span></div>
           </div>
           <div className="as-thread jv-thread">
@@ -932,7 +1048,12 @@ export function AssistantPage() {
               <div className={`as-turn is-${t.who}`} key={i}>
                 <p className="as-said">{t.text}</p>
                 {/* The app's own account of what changed, not the model's. */}
-                {t.done?.length ? (
+                {t.done?.length && split ? (
+                  <button className={`as-act-ref${actIdx === i ? ' is-here' : ''}`} onClick={() => setActTurn(i)}>
+                    {t.done.length} {t.done.length === 1 ? 'change' : 'changes'}{t.done.some((d) => !d.ok) ? `, ${t.done.filter((d) => !d.ok).length} did not apply` : ''}, shown on the right
+                  </button>
+                ) : null}
+                {t.done?.length && !split ? (
                   <>
                     <ul className="as-did">
                       {t.done.map((d, k) => (
@@ -976,19 +1097,15 @@ export function AssistantPage() {
                   </div>
                 ) : null}
                 {t.reply?.show.length && !split ? (
-                  t.reply.show.map((c, k) => (
+                  [...t.reply.show].sort((a, b) => dayRank(a.kind) - dayRank(b.kind)).map((c, k) => (
                     <section className="as-card" key={k}>
                       <h3 className="microcap">{TITLES[c.kind]}</h3>
                       <CardBody kind={c.kind} limit={6} touched={t.touched} />
                     </section>
                   ))
                 ) : null}
-                {t.reply?.next && t.reply.next.length > 0 && (
-                  <div className="as-next">
-                    {t.reply.next.map((n, k) => (
-                      <button className="as-chip" key={k} onClick={() => void send(n)}>{n}</button>
-                    ))}
-                  </div>
+                {t.reply?.next && t.reply.next.length > 0 && i === turns.length - 1 && (
+                  <Chips items={t.reply.next} onPick={(n) => void send(n)} />
                 )}
               </div>
             ))}
@@ -1008,7 +1125,22 @@ export function AssistantPage() {
           {askBox}
         </section>
 
-        {split && <Canvas kinds={canvas} touched={touched} />}
+        {split && (
+          <Canvas
+            kinds={canvas}
+            touched={touched}
+            onAsk={(text) => void send(text)}
+            top={actIdx >= 0 && turns[actIdx]?.done?.length ? (
+              <Activity
+                key={actIdx}
+                done={turns[actIdx].done!}
+                onUndo={(k) => undoOne(actIdx, k)}
+                onUndoAll={() => undoAll(actIdx)}
+                onLog={(k, taskId, m) => logTaskActual(actIdx, k, taskId, m)}
+              />
+            ) : null}
+          />
+        )}
         </div>
       </div>
       <div ref={overlay} className="jv-overlay" aria-hidden="true" />

@@ -1231,6 +1231,11 @@ function useFinder() {
   }
 }
 
+/** Where a card sorts when several come at once: the day, then the days after it,
+ *  then the list, then everything else in the order it arrived. */
+const DAY_FIRST: Partial<Record<CardKind, number>> = { today: 0, planned: 1, backlog: 2 }
+export const dayRank = (k: CardKind): number => DAY_FIRST[k] ?? 3
+
 export interface Turn { who: 'you' | 'it'; text: string; reply?: Reply; done?: Done[]; touched?: string[]; /** The LOVE YOU 3000 reply: the core plays its own show. */ egg?: boolean }
 
 /** Where a turn's changes landed: the cards that hold them, in the order they
@@ -1268,7 +1273,11 @@ export function useAssistantThread() {
   /* What the right half is showing. It survives a reply that names no cards,
      because a canvas that empties itself every time he asks a plain question is
      a canvas he cannot work from. */
-  const [canvas, setCanvas] = useState<CardKind[]>(['today'])
+  const [canvas, setCanvasRaw] = useState<CardKind[]>(['today'])
+  /* The day leads. A turn that made a project and seven tasks touched both, and
+     the project list used to open first with the day below the fold, though the
+     day was what he asked about (his report, 2026-11-07). The rest keep their order. */
+  const setCanvas = (ks: CardKind[]) => setCanvasRaw([...ks].sort((a, b) => dayRank(a) - dayRank(b)))
   /** Rows the last change touched, marked on the canvas. */
   const [touched, setTouched] = useState<string[]>([])
   /* The answer as it is being written. The model emits its sentence first, so
@@ -1348,7 +1357,9 @@ export function useAssistantThread() {
          was rejected", which sends him to fix the wrong field. */
       const provider = PROVIDERS[getAiProvider()]
       setErr(
-        out.reason === 'no-key' ? `No ${provider.label} key yet.`
+        out.reason === 'claude-down' ? (out.detail === 'off' ? 'JARVIS cannot reach Claude from this device.'
+          : out.detail === 'mac-off' ? 'Your Mac is not answering.' : 'Claude did not answer.')
+        : out.reason === 'no-key' ? `No ${provider.label} key yet.`
           : out.reason === 'rejected' ? `That ${provider.label} key was rejected.`
             : out.reason === 'offline' ? 'Could not reach the model.'
               : out.reason === 'rate-limit' ? 'Too many questions in the last minute.'
@@ -1356,7 +1367,10 @@ export function useAssistantThread() {
                 : out.detail ?? 'The answer came back unreadable.',
       )
       setErrHint(
-        out.reason === 'no-key' ? 'Add one in Settings. It stays on this device.'
+        out.reason === 'claude-down' ? (out.detail === 'off' ? 'Sign in under Settings, Your account. Claude needs your login here, not a key.'
+          : out.detail === 'mac-off' ? 'Wake the Mac and check the Claude helper is running. This device has no Gemini or Groq key to answer instead.'
+          : 'Ask again. If it keeps happening, check the Claude helper on your Mac.')
+        : out.reason === 'no-key' ? 'Add one in Settings. It stays on this device.'
           : out.reason === 'rejected' ? `Check it in Settings, or generate a new one at ${provider.getKeyUrl}.`
             : out.reason === 'model-gone' ? 'The model this app used was retired. This build already moved to its replacement, so reload the page.'
               : out.reason === 'offline' ? 'Check the connection and ask again.'

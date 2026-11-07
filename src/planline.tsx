@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import * as Icon from './icons'
 import { Linkify } from './widgets'
-import type { Task } from './types'
+import { SLOTS, type Task } from './types'
 import { isEstimated, taskMinutes, fmtDuration } from './util'
 import { layoutDay, placeAt, toHM, type LineItem } from './line'
 
@@ -71,21 +71,42 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, f
      stretch under fifteen minutes is a join, not a gap: no prompt, still a
      place to drop. The day opens with the free time before the first task and
      closes with the free time to midnight, so both ends take a drop too. */
-  type Block = { k: 'task'; it: LineItem<Row> } | { k: 'gap' | 'join'; s: number; e: number }
-  const blocks: Block[] = []
+  type Block = { k: 'task'; it: LineItem<Row> } | { k: 'gap' | 'join'; s: number; e: number } | { k: 'slot'; id: string; label: string; hint: string }
+  const raw: Block[] = []
   const first = items[0]
   const lead = isToday ? Math.max(DAY_START, Math.ceil(now / 15) * 15) : DAY_START
-  if (!first) blocks.push({ k: 'gap', s: lead, e: 24 * 60 })
-  else if (first.s - lead >= 15) blocks.push({ k: 'gap', s: lead, e: first.s })
+  if (!first) raw.push({ k: 'gap', s: lead, e: 24 * 60 })
+  else if (first.s - lead >= 15) raw.push({ k: 'gap', s: lead, e: first.s })
   let reach = 0
   items.forEach((it, i) => {
-    blocks.push({ k: 'task', it })
+    raw.push({ k: 'task', it })
     reach = Math.max(reach, it.s + it.d)
     const nx = items[i + 1]
-    if (!nx) { if (24 * 60 - reach >= 15) blocks.push({ k: 'gap', s: reach, e: 24 * 60 }); return }
-    if (nx.s - reach >= 15) blocks.push({ k: 'gap', s: reach, e: nx.s })
-    else blocks.push({ k: 'join', s: reach, e: Math.max(reach, nx.s) })
+    if (!nx) { if (24 * 60 - reach >= 15) raw.push({ k: 'gap', s: reach, e: 24 * 60 }); return }
+    if (nx.s - reach >= 15) raw.push({ k: 'gap', s: reach, e: nx.s })
+    else raw.push({ k: 'join', s: reach, e: Math.max(reach, nx.s) })
   })
+
+  /* The day's parts (his ask, 2026-11-07: "no divider for noon, afternoon, evening"). A labelled divider
+     opens each part that has anything in it, and a free stretch that runs across a boundary is cut there,
+     so the divider sits at 12:00, 14:00 and 18:00 and not at the next task. */
+  const cuts = SLOTS.slice(1).map((x) => x.from * 60)
+  const spans: Block[] = []
+  for (const b of raw) {
+    if (b.k !== 'gap' && b.k !== 'join') { spans.push(b); continue }
+    let from = b.s
+    for (const c of cuts) if (c > from && c < b.e) { spans.push({ k: b.k, s: from, e: c }); from = c }
+    spans.push({ k: b.k, s: from, e: b.e })
+  }
+  const startOf = (b: Block) => (b.k === 'task' ? b.it.s : b.k === 'slot' ? 0 : b.s)
+  const slotAt = (m: number) => [...SLOTS].reverse().find((x) => m >= x.from * 60) ?? SLOTS[0]
+  const blocks: Block[] = []
+  let lastSlot = ''
+  for (const b of spans) {
+    const sl = slotAt(startOf(b))
+    if (sl.id !== lastSlot) { blocks.push({ k: 'slot', id: sl.id, label: sl.label, hint: sl.hint }); lastSlot = sl.id }
+    blocks.push(b)
+  }
 
   const where = (e: React.DragEvent): { key: string; start: number; y?: number } | null => {
     const row = (e.target as Element).closest('[data-slot]') as HTMLElement | null
@@ -133,6 +154,11 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, f
       onDrop={drop}
     >
       {blocks.map((b) => {
+        if (b.k === 'slot') return (
+          <div key={`slot-${b.id}`} className="pl-slot" role="separator" aria-label={`${b.label}, ${b.hint}`}>
+            <b>{b.label}</b><span>{b.hint}</span><i aria-hidden="true" />
+          </div>
+        )
         if (b.k === 'task') {
           const { it } = b, t = it.t.task, e = it.s + it.d, H = hOf(it.d), key = `t-${it.id}`
           const live = isToday && !t.done && now >= it.s && now < e

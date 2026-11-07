@@ -13286,3 +13286,10 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
   .dock-item--page .dock-item-avatar { width: calc(var(--dock-circle) - 12px); height: calc(var(--dock-circle) - 12px); }
   .dock-mini-btn { width: 34px; height: 34px; }
 }
+
+/* Part-of-the-day dividers in the line view (2026-11-07). A rule across the whole row, label on the left. */
+.pl-slot { display: flex; align-items: baseline; gap: 10px; padding: 18px 0 6px; }
+.pl-slot:first-child { padding-top: 4px; }
+.pl-slot b { font-size: var(--text-sm); font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+.pl-slot span { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+.pl-slot i { flex: 1; align-self: center; height: 1px; background: var(--hairline-strong); }

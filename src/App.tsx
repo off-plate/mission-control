@@ -441,7 +441,6 @@ const MORE_PAGES: { id: PageId; label: string; icon: ReactNode }[] = [
   { id: 'calendar', label: 'Calendar', icon: <Icon.DockCalendar size={22} /> },
   { id: 'notes', label: 'Notes', icon: <Icon.DockNote size={22} /> },
   { id: 'ideas', label: 'Ideas', icon: <Icon.DockBulb size={22} /> },
-  { id: 'invoices', label: 'Invoices', icon: <Icon.DockInvoice size={22} /> },
   { id: 'business', label: 'Business', icon: <Icon.DockChartBar size={22} /> },
   { id: 'people', label: 'People', icon: <Icon.DockPeople size={22} /> },
   { id: 'timeline', label: 'Jar', icon: <Icon.DockHistory size={22} /> },
@@ -876,17 +875,7 @@ export default function App() {
             <span className="btn-sq-label">Ideas</span>
             {promptsReady && <span className="btn-sq-dot" aria-hidden="true" />}
           </button>
-          {/* Invoices, right after Ideas on his instruction (2026-11-01). */}
-          <button
-            className={`btn btn-ghost btn-sq hide-phone${page === 'invoices' ? ' is-on' : ''}`}
-            onClick={() => setPage('invoices')}
-            aria-pressed={page === 'invoices'}
-            aria-label="Invoices"
-            title="Invoices"
-          >
-            <Icon.DockInvoice size={16} />
-            <span className="btn-sq-label">Invoices</span>
-          </button>
+          {/* Invoices left the Life header for Business only (his ask, 2026-11-07): Business mode's own menu carries it. */}
           {/* People, next to Ideas on his instruction (2026-09-17). */}
           <PeopleButton on={page === 'people'} open={() => setPage('people')} />
           <button

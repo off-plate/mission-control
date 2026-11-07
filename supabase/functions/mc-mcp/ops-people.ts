@@ -156,6 +156,33 @@ function findRow(rows: Row[], ref: { id?: string; title?: string }, label: strin
   const near = rows.filter((r) => words.some((w) => w.length >= 3 && full(r).includes(w))).slice(0, 5).map((r) => `${r.id}: ${nameOf(r)}`)
   throw new McError(`No ${label} matches "${ref.title}".${near.length ? ` Similar: ${near.join(' | ')}.` : ''}`)
 }
+
+/** The forgiving match findRow uses to FIND a person, for the list filters too, so searching and
+ *  editing agree: "Milan Shadek" finds "Milan Šádek" in list_people as well as in edit_person.
+ *  Accents and word order do not matter, sh/zh/ch may stand in for š/ž/č, one typo is tolerated. */
+const looseText = (t: string) => fold(t).replace(/sh/g, 's').replace(/zh/g, 'z').replace(/ch/g, 'c').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+const nearOne = (a: string, b: string): boolean => {
+  if (a === b) return true
+  if (Math.abs(a.length - b.length) > 1) return false
+  let i = 0
+  while (i < a.length && i < b.length && a[i] === b[i]) i++
+  return a.slice(i + 1) === b.slice(i + 1) || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i)
+}
+export function nameLike(hay: string, query: string): boolean {
+  const q = fold(query)
+  if (!q) return true
+  const h = fold(hay)
+  if (h.includes(q)) return true
+  const words = q.split(/\s+/).filter((w) => w.length >= 2)
+  if (words.length && words.every((w) => h.includes(w))) return true
+  const lh = looseText(hay)
+  const lw = looseText(query).split(' ').filter((w) => w.length >= 2)
+  if (!lw.length) return false
+  if (lw.every((w) => lh.includes(w))) return true
+  const names = lh.split(' ')
+  return lw.every((w) => names.some((n) => (w.length >= 4 && n.length >= 4 ? nearOne(w, n) : n === w)))
+}
+
 const findPerson = (b: Blob, ref: { id?: string; title?: string }): Row => findRow(arr(b, 'people'), ref, 'person', (p) => String(p.name ?? ''))
 const findProspect = (b: Blob, ref: { id?: string; title?: string }): Row =>
   findRow(arr(b, 'prospects'), ref, 'prospect', (p) => String(p.name ?? ''), (p) => String(p.domain ?? ''))
@@ -343,7 +370,7 @@ export function listPeople(b: Blob, i: ListPeopleInput): Row {
     }
   })
   let rows = view
-  if (q) rows = rows.filter((v) => fold(`${v.p.name} ${v.p.rel ?? ''} ${v.p.job ?? ''}`).includes(q))
+  if (q) rows = rows.filter((v) => nameLike(`${v.p.name} ${v.p.rel ?? ''} ${v.p.job ?? ''}`, i.query!))
   if (i.tier) rows = rows.filter((v) => v.p.tier === i.tier)
   if (i.overdueOnly) rows = rows.filter((v) => v.row.overdue)
   if (i.birthdaysWithinDays !== undefined) rows = rows.filter((v) => v.birthdayIn !== undefined && v.birthdayIn <= i.birthdaysWithinDays!)
@@ -491,7 +518,7 @@ export function listProspects(b: Blob, i: ListProspectsInput): Row {
   if (i.openOnly) rows = rows.filter((p) => isOpen({ stage: stageOf(p) }))
   if (i.needsFollowUp) rows = rows.filter((p) => isReady({ ...p, stage: stageOf(p) }, today))
   const q = i.query ? fold(i.query) : ''
-  if (q) rows = rows.filter((p) => fold(`${p.name} ${p.domain ?? ''} ${p.why ?? ''} ${arr(p, 'people').map((x) => x.name).join(' ')}`).includes(q))
+  if (q) rows = rows.filter((p) => nameLike(`${p.name} ${p.domain ?? ''} ${p.why ?? ''} ${arr(p, 'people').map((x) => x.name).join(' ')}`, i.query!))
   rows = [...rows].sort((a, c) => (c.updatedAt ?? 0) - (a.updatedAt ?? 0))
   const limit = Math.min(Math.max(i.limit ?? 30, 1), 100)
   return {

@@ -176,7 +176,7 @@ assert.equal(M.rowKey('notes', { id: 'q' }), M.appRowKey('notes', { id: 'q' }))
   b.projects.push({ id: 'p-x', name: 'Zzz', space: 'work', tag: 'sonar2' })
   refuses(() => M.addProject(b, 'sonar', 'work'), /already exists/)
   const dup = M.addProject(b, 'So-nar!', 'work') // slug "sonar" is taken by Sonar
-  assert.equal(b.projects.find((p) => p.id === dup.id).tag, 'sonar-2', 'a second project with the same tag gets -2')
+  assert.equal(b.projects.find((p) => p.id === dup.id).tag, 'sonar3', 'the app\'s freeTag: sonar taken, sonar2 taken (Zzz), so sonar3')
   M.renameProject(b, 'Off-Plate', 'Off-Plate 2')
   assert.equal(b.projects.find((p) => p.id === 'p-off').name, 'Off-Plate 2')
 }

@@ -22,8 +22,14 @@ import { z } from 'npm:zod@^4.3.6'
 
 import { makeReg } from './reg.ts'
 import { register as core } from './tools-core.ts'
+import { register as goals } from './tools-goals.ts'
+import { register as people } from './tools-people.ts'
+import { register as money } from './tools-money.ts'
+import { register as planning } from './tools-planning.ts'
+import { register as library } from './tools-library.ts'
+import { register as focus } from './tools-focus.ts'
 
-const MODULES = [core]
+const MODULES = [core, goals, people, money, planning, library, focus]
 
 const INSTRUCTIONS = `This is Michael's Mission Control: his personal life dashboard (tasks, habits, routines, goals, notes, people, bills).
 - Start with get_overview or get_day. Dates are YYYY-MM-DD in Prague time; times are HH:MM, 24 hour.

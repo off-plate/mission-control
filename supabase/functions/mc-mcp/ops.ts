@@ -275,11 +275,11 @@ export function addProject(b: Blob, name: string, space: 'personal' | 'work'): {
   if (!trimmed) throw new McError('A project needs a name.')
   const projects = ensure(b, 'projects')
   if (projects.some((p) => fold(String(p.name)) === fold(trimmed))) throw new McError(`A project called "${trimmed}" already exists.`)
-  // Two projects named alike would answer to one tag; the second gets "-2" (src/store/planner.ts freeTag).
+  // Two projects named alike would answer to one tag; the second gets "2", then "3" (src/tags.ts freeTag: "home" then "home2").
   const taken = new Set(projects.map(tagOf))
   const base = slugTag(trimmed)
   let tag = base
-  for (let n = 2; taken.has(tag); n++) tag = `${base}-${n}`
+  for (let n = 2; taken.has(tag); n++) tag = `${base}${n}`
   const row: Row = { id: newId('proj'), name: trimmed, space, createdAt: dateKey() }
   if (tag !== base) row.tag = tag
   projects.push(row)

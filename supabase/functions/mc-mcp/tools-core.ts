@@ -1,5 +1,6 @@
 /* v1: tasks, projects, notes, plain habits, and the reads over everything. */
 import * as ops from './ops.ts'
+import { creditGoal } from './ops-goals.ts'
 import type { Reg } from './reg.ts'
 
 export function register(r: Reg): void {
@@ -16,7 +17,7 @@ export function register(r: Reg): void {
   r.tool('list_projects', { title: 'List projects', description: 'Projects with their hashtag, space and open task count.', inputSchema: z.object({}), annotations: ann.RO }, () => read(ops.listProjects))
   r.tool('list_habits', { title: 'List habits', description: 'Habits, whether each is kept today, and whether this connector can tick it.', inputSchema: z.object({}), annotations: ann.RO }, () => read(ops.listHabits))
   r.tool('list_notes', { title: 'List notes', description: 'Notes, newest edited first, optionally filtered by words in the title or body.', inputSchema: z.object({ query: z.string().optional(), limit: z.number().int().min(1).max(100).optional() }), annotations: ann.RO }, (i) => read((b) => ops.listNotes(b, i)))
-  r.tool('get_note', { title: 'Read a note', description: 'The full text of one note.', inputSchema: z.object(ref), annotations: ann.RO }, (i) => read((b) => ops.getNote(b, i)))
+  r.tool('get_note', { title: 'Read a note', description: 'The full text of one note, found by its id or by part of its title. Use list_notes first to find it.', inputSchema: z.object(ref), annotations: ann.RO }, (i) => read((b) => ops.getNote(b, i)))
   r.tool('browse', {
     title: 'Browse other data', description: `Read-only. Return rows as stored from: ${ops.BROWSABLE.join(', ')}. Use query to filter by words anywhere in a row.`,
     inputSchema: z.object({ collection: z.enum(ops.BROWSABLE), query: z.string().optional(), limit: z.number().int().min(1).max(100).optional() }), annotations: ann.RO,
@@ -31,8 +32,19 @@ export function register(r: Reg): void {
     title: 'Change a task', description: 'Retitle, estimate, move between days or back to the list, pin or unpin a time, change space or project. Only the fields you pass change. project: null takes it out of its project; at: null unpins the time.',
     inputSchema: z.object({ ...ref, new_title: z.string().optional(), minutes: z.number().int().min(1).optional(), space: space.optional(), project: z.string().nullable().optional(), at: z.string().nullable().optional(), slot: slot.optional(), list: z.enum(['today', 'backlog']).optional(), date: z.string().optional() }), annotations: ann.WI,
   }, ({ id, title, new_title, ...p }) => write((b) => ops.updateTask(b, { id, title }, { ...p, ...(new_title !== undefined ? { title: new_title } : {}) })))
-  r.tool('complete_task', { title: 'Finish a task', description: 'Mark a task done. Does not log how long it took; use log_task_time for that.', inputSchema: z.object(ref), annotations: ann.WI }, (i) => write((b) => ops.completeTask(b, i)))
-  r.tool('reopen_task', { title: 'Reopen a task', description: 'Mark a finished task as not done.', inputSchema: z.object(ref), annotations: ann.WI }, (i) => write((b) => ops.reopenTask(b, i)))
+  /* store.tsx toggleTask: finishing a task feeds the weekly goal it counts toward, reopening takes it back. */
+  r.tool('complete_task', { title: 'Finish a task', description: 'Mark a task done (and credit the weekly goal it counts toward). Does not log how long it took; use log_task_time for that.', inputSchema: z.object(ref), annotations: ann.WI }, (i) => write((b) => {
+    const t = ops.findTask(b, i); const was = !!t.done
+    const res = ops.completeTask(b, i)
+    const fed = !was ? creditGoal(b, t, 1) : null
+    return fed ? { ...res, text: `${res.text} Goal: ${fed}.` } : res
+  }))
+  r.tool('reopen_task', { title: 'Reopen a task', description: 'Mark a finished task as not done (and take back what it added to its weekly goal).', inputSchema: z.object(ref), annotations: ann.WI }, (i) => write((b) => {
+    const t = ops.findTask(b, i); const was = !!t.done
+    const res = ops.reopenTask(b, i)
+    const fed = was ? creditGoal(b, t, -1) : null
+    return fed ? { ...res, text: `${res.text} Goal: ${fed}.` } : res
+  }))
   r.tool('set_task_steps', { title: "Set a task's steps", description: "Replace a task's subtasks. An empty list removes them.", inputSchema: z.object({ ...ref, steps }), annotations: ann.WI }, ({ id, title, steps: st }) => write((b) => ops.setSteps(b, { id, title }, st)))
   r.tool('delete_task', { title: 'Delete a task', description: 'Delete a task for good. Confirm with the user first unless they asked for it.', inputSchema: z.object(ref), annotations: ann.D }, (i) => write((b) => ops.deleteTask(b, i)))
 

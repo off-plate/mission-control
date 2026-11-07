@@ -11,6 +11,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { dbClient, currentAccount } from './supabase'
 import { Segmented } from './ui'
+import { RevolutInsights } from './revolutinsightsview'
+import { addDays, type Row } from './revolutinsights'
 import './revolut.css'
 
 interface Tx { id: string; product: string; type: string; started: string; description: string; amount: number; state: string; balance: number | null; category: string; internal: boolean }
@@ -43,6 +45,7 @@ export function RevolutPage() {
   const [pocket, setPocket] = useState<'all' | string>('all')
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
+  const [all, setAll] = useState<Row[] | null>(null)
 
   const fetchRows = useCallback(async (from: number, replace: boolean) => {
     const c = dbClient()
@@ -84,6 +87,32 @@ export function RevolutPage() {
     return () => { live = false }
   }, [])
 
+  /* Two years of rows for the insights: pages of 1000, oldest first, so balances can be carried forward. */
+  const asOf = sync?.range_to ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(new Date())
+  useEffect(() => {
+    if (!me) return
+    let live = true
+    ;(async () => {
+      const c = dbClient()
+      if (!c) return
+      const from = addDays(asOf, -730)
+      const out: Row[] = []
+      for (let i = 0; i < 20000; i += 1000) {
+        const { data, error } = await c.from('mc_revolut_tx')
+          .select('day, started, product, amount, balance, category, internal, state, description')
+          .gte('day', from).order('started', { ascending: true }).order('seq', { ascending: true }).order('id', { ascending: true }).range(i, i + 999)
+        if (error) { if (live) setErr(error.message); return }
+        for (const r of (data ?? []) as Record<string, unknown>[]) {
+          out.push({ day: String(r.day), started: String(r.started), product: String(r.product), amount: Number(r.amount), balance: r.balance === null ? null : Number(r.balance),
+            category: String(r.category), internal: !!r.internal, state: String(r.state), description: String(r.description) })
+        }
+        if (!data || data.length < 1000) break
+      }
+      if (live) setAll(out)
+    })()
+    return () => { live = false }
+  }, [me, asOf])
+
   useEffect(() => {
     const t = window.setTimeout(() => { void fetchRows(0, true) }, q ? 250 : 0)
     return () => window.clearTimeout(t)
@@ -120,6 +149,8 @@ export function RevolutPage() {
           </div>
         ))}
       </div>
+
+      {all ? <RevolutInsights rows={all} asOf={asOf} /> : sync && <p className="rv-quiet">Loading insights</p>}
 
       <h2 className="rv-h">By month</h2>
       <div className="rv-scroll rv-monthbox">

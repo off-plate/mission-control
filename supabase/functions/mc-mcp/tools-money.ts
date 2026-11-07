@@ -76,7 +76,7 @@ export function register(r: Reg): void {
   r.tool('end_cycle', {
     title: 'End the cycle',
     description: 'The Bills page "End cycle": moves Bills to the next cycle and carries money_left (what he actually has left right now, CZK, negative if short) in as "From last cycle". Anything still unpaid shows as overdue in the new cycle; nothing is deleted. There is no undo in the app, so ask for the figure instead of guessing it (get_cycle_summary free_to_spend is what the page suggests).',
-    inputSchema: z.object({ money_left: z.number().min(-1e9).max(1e9).describe('CZK he really has left now') }), annotations: ann.W,
+    inputSchema: z.object({ money_left: z.number().min(-1e9).max(1e9).describe('CZK he really has left now') }), annotations: ann.D,
   }, ({ money_left }) => safe(() => m.endCycle(db, uid, { money_left })))
 
   /* ---------------- one-offs ---------------- */
@@ -191,7 +191,7 @@ export function register(r: Reg): void {
   r.tool('import_debts', {
     title: 'Set debt balances in bulk',
     description: 'The Bills page "Paste a list": one entry per debt with name and amount owed now. A name matching an ACTIVE debt updates it (balance, started-at amount and type, and the debt start date moves to today, so older payments stop counting: the figure is what is owed now); a new name adds a debt with no payment plan. Amounts are whole crowns. Use it to reset what is owed today; use edit_debt for a payment plan or interest.',
-    inputSchema: z.object({ debts: z.array(z.object({ name: z.string(), amount: z.number().positive().max(1e10), kind: kindDebt.optional() })).min(1).max(40) }), annotations: ann.WI,
+    inputSchema: z.object({ debts: z.array(z.object({ name: z.string(), amount: z.number().positive().max(1e10), kind: kindDebt.optional() })).min(1).max(40) }), annotations: ann.D,
   }, ({ debts }) => safe(() => m.importDebts(db, uid, debts)))
 
   /* ---------------- the ledger ---------------- */

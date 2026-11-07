@@ -19,19 +19,22 @@ rows. The library's service-role client is never used.
 - `ops-<area>.ts` + `tools-<area>.ts`  one pair per area; `index.ts` registers them all (MODULES)
 - tests: `tools/mcp-*-test.mjs` (each area, `mcp-all-test.mjs` registers everything together), kit in `tools/mcp-test-kit.mjs`
 
-## Areas (101 tools)
-- core: overview, day, tasks (add, change, finish, reopen, steps, delete), projects, notes (add, append, rewrite, tick, delete), browse
-- growth: habits (every kind, bulk tick, kind/look/target edits), routines (steps, un-finish, past-day finish, delete with goals), quit habits and slips, amounts/counts, the daily review marker
-- goals: goals, progress, milestones, repeat, tasks feeding goals, delete project, project tag/colour
-- people: people, links between people, contact log (log, correct, remove), and the full Business pipeline (add/edit/delete prospects, notes, links, next step, finished clients, contacts, touches, replies, meeting prep)
-- money: this cycle's bills, debts, transactions; mark paid, skip, expense, income (compass_* tables)
+## Areas (144 tools)
+- core: overview, day, tasks (add, change, finish, reopen, steps, delete), projects, notes, browse
+- tasks: bulk add / complete / reopen / update / delete, up to 60 at a time, all or nothing
+- growth: habits (every kind), routines, quit habits and slips, amounts, bulk tick, the daily review
+- goals: goals (all fields incl. timeframe), progress, milestones, repeat, end-of-period rollover, tasks feeding goals, delete project, tag/colour
+- people: people, links between people, contacts, and the Business prospects pipeline (stage, notes, links, next step, replies, delete)
+- money: the whole Bills page: this cycle, recurring bills, one-offs, income, debts, ledger transactions, partial and past-cycle payments, end cycle (compass_* tables)
 - planning: plan_day (many placements, all or nothing), day_capacity, log_task_time, log_focus, focus_stats, get_calendar
 - library: note extras and folders, ideas board, prompts, gym goals
-- focus: start_focus, stop_focus, pause_focus, resume_focus, extend_focus, start_break, get_focus_timer. Written into the synced `activeFocus` field (the same one src/pomodoro.tsx mirrors), so the timer shows on every device on its next sync, with no open app needed; stopping early logs the minutes worked
+- focus: start, stop, pause, resume, extend, break, status. Written into the synced `activeFocus` field (the one src/pomodoro.tsx mirrors), so the timer shows on every device on its next sync, no open app needed; stopping early logs the minutes worked
 
-## Not here (each tool says so instead of guessing)
-Editing or deleting recurring bills, debts and income; partial bill payments; changing a goal's
-timeframe; a few multi-row deletes the safety stop refuses (a project with many tasks: use move or the app); AI task breakdown (Claude writes the steps itself with set_task_steps).
+## Safety
+Writes are compare-and-swap with a stop that refuses an operation removing more rows than it declared (`allowShrink`
+is how a cascade, such as deleting a person with their contacts, declares its exact size). Anything destructive is
+annotated destructive so Claude asks first. Tools refuse only where the app itself has no such operation, the value is
+derived, or the request is ambiguous; they say why.
 
 ## Deploy
     export SUPABASE_ACCESS_TOKEN=$(cat ~/.config/mission-control/supabase-token)

@@ -310,7 +310,7 @@ const fresh = (t = TODAY) => { const w = world(t); return { w, db: fakeDb(clone(
   eq(srv.names().sort(), [...ORIGINAL, 'add_debt', 'add_recurring_bill', 'add_transaction', 'add_unreasonable_expense', 'delete_debt', 'delete_expense', 'delete_income', 'delete_recurring_bill', 'delete_transaction', 'delete_unreasonable_expense', 'edit_debt', 'edit_expense', 'edit_income', 'edit_recurring_bill', 'edit_transaction', 'edit_unreasonable_expense', 'end_cycle', 'import_debts', 'list_one_offs', 'list_recurring_bills'].sort())
   for (const nm of srv.names()) { const c = srv.tools[nm].cfg; ok(c.title && c.description && c.inputSchema && c.annotations, `${nm} is fully described`) }
   eq(srv.names().filter((x) => srv.tools[x].cfg.annotations.readOnlyHint).sort(), ['get_bills', 'get_cycle_summary', 'list_debts', 'list_one_offs', 'list_recurring_bills', 'list_transactions'])
-  eq(srv.names().filter((x) => srv.tools[x].cfg.annotations.destructiveHint).sort(), ['delete_debt', 'delete_expense', 'delete_income', 'delete_recurring_bill', 'delete_transaction', 'delete_unreasonable_expense', 'unmark_bill_paid'])
+  eq(srv.names().filter((x) => srv.tools[x].cfg.annotations.destructiveHint).sort(), ['delete_debt', 'delete_expense', 'delete_income', 'delete_recurring_bill', 'delete_transaction', 'delete_unreasonable_expense', 'end_cycle', 'import_debts', 'unmark_bill_paid'])
   for (const nm of srv.names()) ok(/^[a-z]+(_[a-z]+)+$/.test(nm))
   for (const nm of srv.names()) ok(!/\buse the (Bills )?(page|app)\b/i.test(srv.tools[nm].cfg.description), `${nm}: no "use the app" refusal left`)
 

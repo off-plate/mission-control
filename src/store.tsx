@@ -385,6 +385,8 @@ interface Store extends PersistedState {
   toggleSubtask: (taskId: string, subId: string) => void
   /** Rename a step of a task, or change how long it is expected to take. */
   updateSubtask: (taskId: string, subId: string, patch: { title?: string; estimateMin?: number }) => void
+  /** Add one step to a task by hand. Minutes optional: the first step inherits the task's estimate, later ones default to 15. */
+  addSubtask: (taskId: string, title: string, estimateMin?: number) => void
   /** Drop a step. A generated breakdown is a suggestion, not a contract. */
   deleteSubtask: (taskId: string, subId: string) => void
   logSubtaskActual: (taskId: string, subId: string, actualMin: number) => void
@@ -1679,6 +1681,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     moveTasksToToday: plannerSlice.moveTasksToToday,
     assignSlot: plannerSlice.assignSlot,
     setTaskAt: plannerSlice.setTaskAt,
+    addSubtask: plannerSlice.addSubtask,
     updateSubtask: plannerSlice.updateSubtask,
     deleteSubtask: plannerSlice.deleteSubtask,
     toggleSubtask: plannerSlice.toggleSubtask,

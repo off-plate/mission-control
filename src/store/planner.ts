@@ -211,6 +211,18 @@ export function usePlannerSlice(
           : s))
         return { ...t, subtasks, estimateMin: subtasks.reduce((a, s) => a + s.estimateMin, 0), estimated: true }
       })),
+    /* A step he adds himself (his ask, 2026-11-07: every task can have sub tasks, not only a generated
+       breakdown). The first step of a task that already has an estimate inherits it, so adding one step
+       does not quietly shrink the task to a few minutes; after that the task is the sum of its steps. */
+    addSubtask: (taskId: string, title: string, estimateMin?: number) =>
+      setTasks((prev) => prev.map((t) => {
+        const name = title.trim()
+        if (t.id !== taskId || !name) return t
+        const first = !t.subtasks?.length
+        const mins = Math.max(1, Math.round(estimateMin ?? (first && t.estimated && t.estimateMin > 0 ? t.estimateMin : 15)))
+        const subtasks = [...(t.subtasks ?? []), { id: `${taskId}s${Date.now().toString(36)}${(t.subtasks?.length ?? 0).toString(36)}`, title: name, estimateMin: mins, done: false }]
+        return { ...t, subtasks, estimateMin: subtasks.reduce((x, y) => x + y.estimateMin, 0), estimated: true }
+      })),
     deleteSubtask: (taskId: string, subId: string) => {
       const before = tasks
       const t = tasks.find((x) => x.id === taskId)

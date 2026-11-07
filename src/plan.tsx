@@ -64,6 +64,30 @@ const offsetDate = (n: number): string => {
 
 
 
+/* Add a step to a task by hand (his ask, 2026-11-07: every task can have sub tasks). Used under a task's
+   steps in both views. Minutes are optional: the first step takes the task's own estimate, later ones 15. */
+function StepAdd({ taskId, first }: { taskId: string; first: boolean }) {
+  const { addSubtask } = useStore()
+  const [title, setTitle] = useState('')
+  const [mins, setMins] = useState('')
+  const add = () => {
+    const t = title.trim()
+    if (!t) return
+    addSubtask(taskId, t, Number(mins) > 0 ? Number(mins) : undefined)
+    setTitle(''); setMins('')
+  }
+  return (
+    <div className="step-add">
+      <span className="step-add-plus" aria-hidden="true"><Icon.Plus size={12} /></span>
+      <input className="step-add-title" value={title} placeholder={first ? 'Add a first step' : 'Add a step'} aria-label="New step" autoComplete="off" enterKeyHint="done"
+        onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+      <input className="step-add-min mono" type="number" inputMode="numeric" min={1} max={480} value={mins} placeholder="min" aria-label="Minutes for the new step"
+        onChange={(e) => setMins(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+      <button className="step-add-go" disabled={!title.trim()} onClick={add}>Add</button>
+    </div>
+  )
+}
+
 function SubEdit({ taskId, sub }: { taskId: string; sub: SubTask }) {
   const { updateSubtask, deleteSubtask } = useStore()
   const [editing, setEditing] = useState(false)
@@ -1232,6 +1256,7 @@ export function PlanPage() {
       {phone && !t.done && isEstimated(t) && <button role="menuitem" onClick={() => startFocus(taskMinutes(t), t.title)}>Start focus</button>}
       {!t.done && t !== nextUp && <button role="menuitem" onClick={() => pickNext(t.id)}>Make it next up</button>}
       {!t.done && <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>}
+      {!t.done && <button role="menuitem" onClick={() => openSteps(t.id)}>Add a step</button>}
       {!t.done && (
         <>
           <span className="kebab-sep" />
@@ -1261,7 +1286,7 @@ export function PlanPage() {
   )
   const subList = (t: Task) => (
     <div className="subtask-list">
-      {t.subtasks!.map((s) => (
+      {(t.subtasks ?? []).map((s) => (
         <div key={s.id} className="subtask-wrap">
           <button
             className={`subtask${s.done ? ' done' : ''}`}
@@ -1291,8 +1316,21 @@ export function PlanPage() {
           )}
         </div>
       ))}
+      {!t.done && <StepAdd taskId={t.id} first={!t.subtasks?.length} />}
     </div>
   )
+  /* The steps toggle that sits on a task: "2 of 4 steps" when it has some, else a quiet way in. */
+  const stepsToggle = (t: Task) => {
+    const n = t.subtasks?.length ?? 0
+    if (!n && t.done) return null
+    const isExp = expanded.has(t.id)
+    return (
+      <button className="pf-steps" aria-expanded={isExp} aria-label={isExp ? 'Hide steps' : n ? 'Show steps' : 'Add steps'} onClick={() => toggleExp(t.id)}>
+        {n ? `${t.subtasks!.filter((x) => x.done).length} of ${n} steps` : 'Add steps'} <Icon.ChevronDown size={12} />
+      </button>
+    )
+  }
+  const openSteps = (id: string) => setExpanded((p) => new Set(p).add(id))
   const dayRow = (t: Task) => {
     const isExp = expanded.has(t.id)
     const hasSubs = !!t.subtasks?.length
@@ -1345,7 +1383,7 @@ export function PlanPage() {
         {logging === t.id && (
           <ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} />
         )}
-        {hasSubs && isExp && subList(t)}
+        {isExp && subList(t)}
       </div>
     )
   }
@@ -1390,6 +1428,7 @@ export function PlanPage() {
           <Dropdown label={`Options for ${t.title}`}>
             <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
             <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
+            <button role="menuitem" onClick={() => openSteps(t.id)}>Add a step</button>
             {coarse && (
               <>
                 <span className="kebab-head">Plan for a day</span>
@@ -1409,9 +1448,10 @@ export function PlanPage() {
           </span>
           </div>
         </div>
-        {hasSubs && isExp && (
+        {isExp && (
           <div className="subtask-list">
-            {t.subtasks!.map((s) => <SubtaskRow key={s.id} taskId={t.id} sub={s} />)}
+            {(t.subtasks ?? []).map((s) => <SubtaskRow key={s.id} taskId={t.id} sub={s} />)}
+            <StepAdd taskId={t.id} first={!hasSubs} />
           </div>
         )}
       </div>
@@ -1598,6 +1638,8 @@ export function PlanPage() {
                 <div className="pl-log"><ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} /></div>
               ) : null)}
               focus={(t) => () => startFocus(taskMinutes(t), t.title)}
+              steps={(t) => (expanded.has(t.id) ? subList(t) : null)}
+              stepsToggle={stepsToggle}
               flashId={flashId}
               onPlace={(id, writes) => {
                 const t = tasks.find((x) => x.id === id)

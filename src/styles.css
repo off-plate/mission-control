@@ -13293,3 +13293,16 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .pl-slot b { font-size: var(--text-sm); font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
 .pl-slot span { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
 .pl-slot i { flex: 1; align-self: center; height: 1px; background: var(--hairline-strong); }
+
+/* Steps (sub tasks) on a task, both views (2026-11-07). The line view draws them under the card, in the card's column. */
+.pl-steps { grid-column: 3; margin: 0 0 6px; min-width: 0; }
+.pl-steps .subtask-list { margin: 0 0 0 12px; }
+button.pf-steps { border: 0; background: none; padding: 0; font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
+.step-add { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) 0; }
+.step-add-plus { width: 18px; height: 18px; border-radius: 50%; background: var(--surface-2); color: var(--muted); display: grid; place-items: center; flex: none; }
+.step-add-title { flex: 1; min-width: 0; border: 0; border-bottom: 1px solid var(--hairline-strong); background: none; outline: 0; font: inherit; font-size: var(--text-sm); color: var(--ink); padding: 6px 0; }
+.step-add-title:focus, .step-add-min:focus { border-bottom-color: var(--accent-text); }
+.step-add-min { width: 56px; border: 0; border-bottom: 1px solid var(--hairline-strong); background: none; outline: 0; font-size: var(--text-sm); color: var(--ink); padding: 6px 0; text-align: right; }
+.step-add-go { border: 0; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 0.8125rem; font-weight: 700; background: var(--surface-2); color: var(--ink); cursor: pointer; }
+.step-add-go:disabled { opacity: 0.45; cursor: default; }
+.step-add-go:not(:disabled):hover { background: var(--accent-fill, var(--accent)); color: var(--accent-ink); }

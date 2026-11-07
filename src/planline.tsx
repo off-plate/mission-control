@@ -23,7 +23,7 @@ const hOf = (d: number) => Math.max(46, Math.min(240, Math.round(d * 0.8)))
    read dataTransfer, and the length of the thing decides where it fits. */
 let dragging: string | null = null
 
-export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, focus, flashId, onPlace, onAdd }: {
+export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, focus, steps, stepsToggle, flashId, onPlace, onAdd }: {
   day: Task[]
   all: Task[]
   isToday: boolean
@@ -33,6 +33,9 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, f
   check: (t: Task) => void
   log: (t: Task) => ReactNode
   focus: (t: Task) => (() => void) | undefined
+  /** The task's steps, drawn under its card when opened, and the toggle that opens them. */
+  steps: (t: Task) => ReactNode
+  stepsToggle: (t: Task) => ReactNode
   flashId: string | null
   onPlace: (id: string, writes: { id: string; at: string }[]) => void
   onAdd: (title: string, at: string) => void
@@ -134,8 +137,9 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, f
   const pushes = tgt && dragging ? items.some((x) => x.id !== dragging && x.s >= tgt.start && x.s < tgt.start + lenOf(dragging!)) : false
 
   const nowAt = (s: number, e: number) => (isToday && now >= s && now < e ? (now - s) / Math.max(1, e - s) : null)
-  const nowLine = (p: number | null) => (p == null ? null : (
-    <div className="pl-now" style={{ top: `${p * 100}%` }} aria-label={`Now, ${toHM(now)}`}><span>{toHM(now)}</span></div>
+  /* `px` pins the line to the task's own bar height, so opening its steps (a taller row) never moves it. */
+  const nowLine = (p: number | null, px?: number) => (p == null ? null : (
+    <div className="pl-now" style={{ top: px ? `${p * px}px` : `${p * 100}%` }} aria-label={`Now, ${toHM(now)}`}><span>{toHM(now)}</span></div>
   ))
   const mark = (key: string, y?: number) => (tgt?.key === key ? (
     <div className="pl-drop" style={{ top: `${(y ?? tgt.y ?? 0) * 100}%` }}><span>{toHM(tgt.start)}{pushes ? ', pushes the rest later' : ''}</span></div>
@@ -181,6 +185,7 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, f
                   <span className="pl-meta">
                     {tag(t)}
                     <span>{toHM(it.s)} to {toHM(e)}, {it.guess ? 'no estimate yet' : fmtDuration(it.d)}</span>
+                    {stepsToggle(t)}
                     {!it.pinned && !t.done && <span className="pl-flex" title="No set time. It moves with the day until you drag it somewhere.">Flexible</span>}
                     {live && <span className="pl-left">{fmtDuration(e - now)} left</span>}
                   </span>
@@ -193,7 +198,8 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, f
                 )}
                 {menu(t)}
               </div>
-              {nowLine(live ? pct / 100 : null)}
+              {steps(t) && <div className="pl-steps">{steps(t)}</div>}
+              {nowLine(live ? pct / 100 : null, H)}
               {mark(key)}
               {log(t)}
             </div>

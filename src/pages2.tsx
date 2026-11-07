@@ -10,7 +10,7 @@ import {
 } from './speech'
 import { SUPABASE_ENABLED, currentAccount, onAccountChange, sendSignInCode, signInWithCode, signOutAccount, type Account } from './supabase'
 import { describe, useSyncStatus } from './sync'
-import { CLAUDE_MIN_WORDS, CLAUDE_MODELS, claudeBrainOn, getClaudeModel, macOnline, setClaudeBrain, setClaudeModel, type ClaudeModel } from './claudebrain'
+import { CLAUDE_MODELS, claudeBrainOn, getClaudeModel, macOnline, setClaudeBrain, setClaudeModel, type ClaudeModel } from './claudebrain'
 
 /* ---------------- SETTINGS ---------------- */
 
@@ -173,7 +173,7 @@ function AiKeyField() {
   )
 }
 
-/* The Claude brain (claudebrain.ts): long dictations go to a Claude model on
+/* The Claude brain (claudebrain.ts): every request goes to a Claude model on
    his Mac. Off, Haiku or Sonnet in one control. The dot is the Mac's heartbeat,
    so "on" never silently means "waiting for a sleeping laptop". */
 function ClaudeBrainField() {
@@ -197,13 +197,13 @@ function ClaudeBrainField() {
       <div className="source-row">
         <span className={`status-dot ${choice === 'off' ? 'partial' : mac ? 'connected' : 'partial'}`} />
         <span className="info">
-          <span className="name">Claude, for long dictations</span>
+          <span className="name">Claude, the brain JARVIS thinks with first</span>
           <span className="detail" style={{ display: 'block' }}>
             {choice === 'off'
-              ? `Off. Every request goes to Gemini or Groq.`
+              ? 'Off. Every request goes to Gemini or Groq.'
               : mac
-                ? `Your Mac is awake. Requests over ${CLAUDE_MIN_WORDS} words go to Claude, shorter ones stay instant.`
-                : `Your Mac is not answering. Requests go to Gemini until it is awake and the helper is running.`}
+                ? 'Your Mac is awake. Claude answers every request. Gemini only steps in if the Mac is asleep.'
+                : 'Your Mac is not answering. Gemini answers until it is awake and the helper is running.'}
           </span>
         </span>
       </div>

@@ -727,7 +727,7 @@ async function askGemini(messages: Msg[], onSay?: (partial: string) => void, ret
  *  which itself falls back to Gemini on a 429 or 413 when Gemini was not
  *  already tried this call. */
 async function once(messages: Msg[], key: string, onSay?: (partial: string) => void, viaClaude = false): Promise<Outcome> {
-  /* A long dictation goes to Claude on his Mac first (claudebrain.ts). Any
+  /* Claude on his Mac answers first, whatever the length (claudebrain.ts). Any
      failure, Mac asleep included, falls straight through to the brains below
      as if this block were not here. A reply that does not parse also falls
      through: Gemini answers it rather than him seeing "unreadable". */

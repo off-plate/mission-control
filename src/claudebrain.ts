@@ -1,6 +1,6 @@
 /* The Claude brain, the app's half (2026-11-07).
 
-   A long dictation is dropped in the mc_brain mailbox; the daemon on his Mac
+   Every request is dropped in the mc_brain mailbox; the daemon on his Mac
    (tools/claude-brain.mjs) asks `claude -p` and writes the answer back. This
    file posts the request, waits, reads the answer, and deletes the row.
 
@@ -9,8 +9,9 @@
    returns a plain "off" so the assistant answers with Gemini instead. Every
    failure here means "use the other brain", never an error on screen.
 
-   Short commands stay on Gemini: a `claude -p` round takes 15-40 seconds, which
-   is fine for a two-page brain dump and wrong for "tick groceries". */
+   Claude answers EVERY request while it is on (his call, 2026-11-07, after a
+   60-word cut-off annoyed him). Gemini and Groq are the fallback, and they take
+   over instantly when the Mac is asleep, so the default never costs a wait. */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { currentAccount, dbClient } from './supabase'
@@ -25,8 +26,6 @@ export const CLAUDE_MODELS = [
 ] as const
 export type ClaudeModel = (typeof CLAUDE_MODELS)[number]['id']
 
-/** A message must be at least this many words to be worth a Claude round. */
-export const CLAUDE_MIN_WORDS = 60
 const BEAT_FRESH_MS = 90_000
 const CLAIM_WAIT_MS = 10_000
 const REPLY_WAIT_MS = 150_000
@@ -35,7 +34,9 @@ const POLL_MS = 1000
 const read = (k: string): string | null => { try { return localStorage.getItem(k) } catch { return null } }
 const write = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private window */ } }
 
-export const claudeBrainOn = (): boolean => read(ON_KEY) === '1'
+/** ON unless he switched it off: Claude is the default brain, the others are
+ *  the fallback (his call, 2026-11-07: no word limit, "make Claude the default"). */
+export const claudeBrainOn = (): boolean => read(ON_KEY) !== '0'
 export const setClaudeBrain = (on: boolean) => write(ON_KEY, on ? '1' : '0')
 export function getClaudeModel(): ClaudeModel {
   const m = read(MODEL_KEY)
@@ -43,10 +44,8 @@ export function getClaudeModel(): ClaudeModel {
 }
 export const setClaudeModel = (m: ClaudeModel) => write(MODEL_KEY, m)
 
-const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
-
-/** True when this question should go to Claude: switched on, and long enough. */
-export const claudeWanted = (question: string): boolean => claudeBrainOn() && words(question) >= CLAUDE_MIN_WORDS
+/** True when this question should go to Claude first: unless he switched it off. */
+export const claudeWanted = (_question: string): boolean => claudeBrainOn()
 
 /* A test seam: the unit test hands in a fake mailbox instead of Supabase. */
 let override: { client: SupabaseClient; uid: string } | null = null

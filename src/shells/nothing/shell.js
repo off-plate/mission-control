@@ -39,6 +39,23 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const FRAME = /[?&]frame=1/.test(location.search);
 const NOREVIEW = /[?&]noreview=1/.test(location.search);
 const APP = ROOT.getElementById('app');
+/* iOS does not shrink the layout viewport when the keyboard opens, it only covers it, so a bar pinned to
+   the bottom of #app ended up behind the keys (the Jarvis ask box vanished, 2026-11-07). Follow the
+   visual viewport instead: #app is cut to the part of the screen the keyboard leaves free. */
+{
+  const vv = window.visualViewport;
+  if (vv) {
+    const fit = () => {
+      if (dead) return;
+      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      APP.style.top = vv.offsetTop > 0 ? Math.round(vv.offsetTop) + 'px' : '';
+      APP.style.bottom = kb > 0 ? kb + 'px' : '';
+      APP.classList.toggle('kbd', kb > 80);
+    };
+    vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit);
+    ROOT.addEventListener('focusin', () => setTimeout(fit, 250));
+  }
+}
 
 /* ---------- the real clock ---------- */
 const NOW = () => new Date();
@@ -3093,7 +3110,7 @@ V.jarvis = {
   after(el, a, fresh, e) {
     if (!e || e.jvOff) return;
     jvSig = '';
-    const go = () => jvPaint(e), off1 = B.assistant.subscribe(go), off2 = B.assistant.mic.subscribe(go);
+    const go = () => { jvPaint(e); if (B.assistant.mic.state() === 'idle') micSay(); }, off1 = B.assistant.subscribe(go), off2 = B.assistant.mic.subscribe(go);
     e.jvOff = () => { off1(); off2(); }; e.onclose = e.jvOff;
     const q = $('#jvq', el); q.addEventListener('input', go);
     jvPaint(e, true);
@@ -3102,7 +3119,9 @@ V.jarvis = {
 };
 A.jvSend = () => { const e = top_(), q = $('#jvq', e.el), v = (q.value || '').trim(), st = B.assistant.state(); if (!v || st.busy) return; q.value = ''; B.assistant.send(v); jvPaint(e); };
 A.jvAsk = (el) => { const st = B.assistant.state(); if (st.busy) return; B.assistant.send(el.dataset.q, el.dataset.l !== el.dataset.q ? el.dataset.l : undefined); };
-A.jvMic = () => { const e = top_(), q = $('#jvq', e.el); if (!B.assistant.mic.available()) { toast('Dictation needs a Groq key or a browser that can listen'); return; } B.assistant.mic.toggle(q.value, t => { q.value = t; jvPaint(e); }); };
+const MIC_WHY = { 'not-allowed': 'Microphone is blocked. Allow it for this site in Settings, then try again.', 'service-not-allowed': 'This browser will not dictate here. Add a Groq key in Settings, or open the app in Safari.', 'audio-capture': 'No microphone found.', network: 'Dictation needs a connection.', 'language-not-supported': 'Dictation does not support this language here.' };
+function micSay() { const c = B.assistant.mic.error(); if (c) toast(MIC_WHY[c] || (c.startsWith('stt-') ? 'Transcription failed (' + c.slice(4) + ')' : 'Dictation stopped: ' + c)); }
+A.jvMic = () => { const e = top_(), q = $('#jvq', e.el); if (!B.assistant.mic.available()) { toast('Dictation needs a Groq key or a browser that can listen'); return; } B.assistant.mic.toggle(q.value, t => { q.value = t; jvPaint(e); }); setTimeout(micSay, 700); };
 A.jvUndo = (el, x) => { const [ti, di] = x.split(':'); B.assistant.undo(+ti, +di); };
 A.jvLog = (el, id) => { const t = task(id); if (t) howLong(t); };
 A.jvGo = (el, x) => { const [ti, di] = x.split(':'), d = B.assistant.state().turns[+ti].done[+di]; if (d && d.at && d.at.key && task(d.at.key)) jumpTo(d.at.key); };

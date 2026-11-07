@@ -12,6 +12,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cu
 input,textarea,select{font:inherit;color:inherit;-webkit-user-select:text;user-select:text}
 svg{display:block}
 #app{position:fixed;inset:0;overflow:hidden;background:var(--cv);--st:max(var(--sat,env(safe-area-inset-top)),14px);--sb:var(--sab,env(safe-area-inset-bottom));--db:max(8px,var(--sab,env(safe-area-inset-bottom)))}
+#app.kbd{--sb:0px;--db:8px}
 #app.frame{--st:54px;--sb:30px;--db:30px}
 .noscroll::-webkit-scrollbar,.vsc::-webkit-scrollbar,.hsc::-webkit-scrollbar{display:none}
 

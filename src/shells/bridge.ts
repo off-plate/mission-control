@@ -382,7 +382,7 @@ export interface ShellAssistant {
   undo: (turn: number, done: number) => void
   skills: { label: string; ask: string }[]
   /** The same dictation the Notes page uses. */
-  mic: { available: () => boolean; toggle: (base: string, on: (t: string) => void) => void; state: () => string; subscribe: (cb: () => void) => () => void }
+  mic: { available: () => boolean; toggle: (base: string, on: (t: string) => void) => void; state: () => string; error: () => string; subscribe: (cb: () => void) => () => void }
 }
 /* The conversation outlives the shell: leaving for a classic page (Settings,
    to add a key) unmounts it, and coming back must not forget what was said. */
@@ -466,7 +466,7 @@ export function useShellBridge(skin: SkinId): { mc: MC; api: ShellApi } {
         tRef.current.setTurns((ts) => ts.map((t, i) => (i !== ti ? t : { ...t, done: t.done?.map((x, k) => (k !== di ? x : { ...x, undone: true })) })))
       },
       skills: [MORNING, ...SKILLS],
-      mic: { available: dict.dictationAvailable, toggle: dict.toggle, state: dict.dictateState, subscribe: dict.subscribe },
+      mic: { available: dict.dictationAvailable, toggle: dict.toggle, state: dict.dictateState, error: dict.dictateError, subscribe: dict.subscribe },
     },
     store: () => sRef.current,
     pomo: () => pRef.current,

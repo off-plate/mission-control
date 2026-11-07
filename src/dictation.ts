@@ -72,6 +72,15 @@ export function dictationEngine(): 'browser' | 'whisper' | 'none' {
 }
 
 let state: DictateState = 'idle'
+/* Why the last take ended without listening. Read once by the UI, which turns
+   it into a sentence. Before 2026-11-07 every failure was swallowed and the mic
+   just went quiet, so "dictation doesn't work" had no visible reason. */
+let lastError = ''
+export function dictateError(): string { const e = lastError; lastError = ''; return e }
+function fail(code: string): void {
+  lastError = code
+  set('idle')
+}
 let rec: Recognition | null = null
 let recorder: MediaRecorder | null = null
 let silence: ReturnType<typeof setTimeout> | null = null
@@ -174,7 +183,20 @@ function startBrowser(base: string, onText: OnText, resume = false): void {
      clicked it off. Only a real failure should look like one. */
   /* `no-speech` is a pause, not a failure: Chrome raises it after a few quiet
      seconds, then ends the session. Only a real error stops the take. */
-  r.onerror = (e) => { if (e?.error === 'no-speech') return; rec = null; set('idle') }
+  r.onerror = (e) => {
+    const code = e?.error ?? 'unknown'
+    if (code === 'no-speech' || code === 'aborted') { if (code === 'aborted') { rec = null; set('idle') } return }
+    rec = null
+    /* iOS home-screen apps expose webkitSpeechRecognition but refuse it
+       (service-not-allowed). Recording the mic and sending it to Whisper still
+       works there, so use that when a Groq key exists instead of going silent. */
+    if (canRecord() && getProviderKey('groq') && code !== 'not-allowed') {
+      set('idle')
+      void startWhisper(`${base}${finals} `.replace(/\s+/g, ' ').trimStart(), onText)
+      return
+    }
+    fail(code)
+  }
   /* Chrome ends a continuous session on its own (a pause, about a minute of
      talking). He did not press Stop, so a fresh session picks up where this
      one left off, keeping every word said so far. */
@@ -196,29 +218,32 @@ async function startWhisper(base: string, onText: OnText): Promise<void> {
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true })
   } catch {
-    set('idle')  // permission refused; nothing to say about it that the browser has not
+    fail('not-allowed')
     return
   }
   discard = false
   const chunks: Blob[] = []
-  const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : ''
+  /* Safari records MP4/AAC, never WebM. Labelling its audio as webm made Groq
+     reject it. Pick what this browser can actually produce, name the file to match. */
+  const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((m) => MediaRecorder.isTypeSupported(m)) ?? ''
+  const ext = mime.includes('mp4') ? 'm4a' : 'webm'
   const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
   mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data) }
   mr.onstop = () => {
     releaseMic()
     if (discard) { discard = false; set('idle'); return }
-    const blob = new Blob(chunks, { type: mime || 'audio/webm' })
+    const blob = new Blob(chunks, { type: mime || mr.mimeType || 'audio/webm' })
     if (!blob.size) { set('idle'); return }
     set('transcribing')
     const form = new FormData()
-    form.append('file', blob, 'ask.webm')
+    form.append('file', blob, `ask.${ext}`)
     form.append('model', STT_MODEL)
     form.append('language', 'en')
     form.append('response_format', 'text')
     fetch(GROQ_STT, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form })
       .then((res) => (res.ok ? res.text() : Promise.reject(new Error(String(res.status)))))
       .then((text) => { onText(`${base}${text.trim()}`.replace(/\s+/g, ' ').trimStart()) })
-      .catch(() => { /* the box keeps what he already typed */ })
+      .catch((err) => { lastError = `stt-${err instanceof Error ? err.message : 'failed'}` /* the box keeps what he already typed */ })
       .finally(() => set('idle'))
   }
   recorder = mr

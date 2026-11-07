@@ -59,6 +59,8 @@ export type PageId =
   | 'bills'
   | 'mymind'
   | 'reminders'
+  /** His Revolut CZK statement, read only. Floating button only. */
+  | 'revolut'
   /** Invoices, Fakturoid rebuilt. Header only, next to Ideas. */
   | 'invoices'
   /** The work calendar, read from the feed. Big Time only: see NAV. */

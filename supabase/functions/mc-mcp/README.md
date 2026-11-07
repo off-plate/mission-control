@@ -19,7 +19,7 @@ rows. The library's service-role client is never used.
 - `ops-<area>.ts` + `tools-<area>.ts`  one pair per area; `index.ts` registers them all (MODULES)
 - tests: `tools/mcp-*-test.mjs` (each area, `mcp-all-test.mjs` registers everything together), kit in `tools/mcp-test-kit.mjs`
 
-## Areas (144 tools)
+## Areas (156 tools)
 - core: overview, day, tasks (add, change, finish, reopen, steps, delete), projects, notes, browse
 - tasks: bulk add / complete / reopen / update / delete, up to 60 at a time, all or nothing
 - growth: habits (every kind), routines, quit habits and slips, amounts, bulk tick, the daily review
@@ -27,6 +27,7 @@ rows. The library's service-role client is never used.
 - people: people, links between people, contacts, and the Business prospects pipeline (stage, notes, links, next step, replies, delete)
 - money: the whole Bills page: this cycle, recurring bills, one-offs, income, debts, ledger transactions, partial and past-cycle payments, end cycle (compass_* tables)
 - planning: plan_day (many placements, all or nothing), day_capacity, log_task_time, log_focus, focus_stats, get_calendar
+- reminders: lists, reminders with a time, flags and repeats, ticking a repeating one creates the next, bulk add/complete
 - library: note extras and folders, ideas board, prompts, gym goals
 - focus: start, stop, pause, resume, extend, break, status. Written into the synced `activeFocus` field (the one src/pomodoro.tsx mirrors), so the timer shows on every device on its next sync, no open app needed; stopping early logs the minutes worked
 

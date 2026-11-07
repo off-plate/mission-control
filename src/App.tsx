@@ -1,7 +1,9 @@
 import { Orb } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
 import { ProjectMark, WorkspacePick, usePhone } from './ui'
+import { usePromptWindow } from './promptwindow'
 import { useReminderAlerts } from './reminderalerts'
+import { lastFace } from './ideasswitch'
 import { MiniTitle } from './minititle'
 import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -386,6 +388,17 @@ function PageNav({
 }
 
 
+/* People's header square. Its Personal/Business hover menu went on 2026-11-07: clients live in
+   Business mode now, so People is one page again. */
+function PeopleButton({ on, open }: { on: boolean; open: () => void }) {
+  return (
+    <button className={`btn btn-ghost btn-sq hide-phone${on ? ' is-on' : ''}`} onClick={open} aria-pressed={on} aria-label="People" title="People">
+      <Icon.DockPeople size={16} />
+      <span className="btn-sq-label">People</span>
+    </button>
+  )
+}
+
 /* Phone chrome, rebuilt on his approval of the mockup (2026-10-15,
    claude.ai/artifact/NdogniJE4EQa3aPJ6e2p4m). The old hamburger dropdown was
    small, closed only on a pick or an outside tap, and the header around it
@@ -553,6 +566,7 @@ export default function App() {
   useReminderAlerts(reminders)
   const waitingPrompts = prompts.filter((p) => !p.sentAt).length
   useEffect(() => { try { localStorage.setItem('mc-prompts-waiting', String(waitingPrompts)) } catch { /* private mode */ } }, [waitingPrompts])
+  const promptsReady = usePromptWindow(waitingPrompts).state === 'open' && waitingPrompts > 0
   /* Projects live under Plan now (2026-09-15), so a project's Plan and the
      project directory both light Plan. This is ONLY the nav's own idea of
      which tab is lit; setPage below still gets the real page id. */
@@ -838,8 +852,38 @@ export default function App() {
           >
             <span className="btn-sq-label">Jar</span>
           </button>
-          {/* Notes, Ideas, People, Bills and MyMind left the header for the floating button (his ask,
-              2026-11-07: the header was getting out of hand). All visible there, nothing behind More. */}
+          {/* Notes and Ideas, back in the top right on his instruction
+              (2026-09-15), next to the Zone and Jarvis. The dock keeps its own
+              Note and Ideas for quick capture; these open the full pages. */}
+          <button
+            className={`btn btn-ghost btn-sq biz-keep hide-phone${page === 'notes' ? ' is-on' : ''}`}
+            onClick={() => setPage('notes')}
+            aria-pressed={page === 'notes'}
+            aria-label="Notes"
+            title="Notes"
+          >
+            <Icon.DockNote size={16} />
+            <span className="btn-sq-label">Notes</span>
+          </button>
+          {/* Ideas holds Prompts too since 2026-10-04 (his ask): one square,
+              two faces switched by the page title. It opens the face he used
+              last, or Prompts when the window is open and something waits,
+              and it carries the dot the Prompts square used to. */}
+          <button
+            className={`btn btn-ghost btn-sq hide-phone${page === 'ideas' || page === 'prompts' ? ' is-on' : ''}`}
+            onClick={() => setPage(promptsReady ? 'prompts' : lastFace())}
+            aria-pressed={page === 'ideas' || page === 'prompts'}
+            aria-label="Ideas"
+            title="Ideas"
+          >
+            <Icon.DockBulb size={16} />
+            <span className="btn-sq-label">Ideas</span>
+            {promptsReady && <span className="btn-sq-dot" aria-hidden="true" />}
+          </button>
+          {/* Invoices left the Life header for Business only (his ask, 2026-11-07): Business mode's own menu carries it. */}
+          {/* People, next to Ideas on his instruction (2026-09-17). */}
+          <PeopleButton on={page === 'people'} open={() => setPage('people')} />
+          {/* Bills and MyMind moved to the floating button (his ask, 2026-11-07). The rest stays here. */}
           {/* Apps and Settings left the header for the dock's More on his
               instruction (2026-09-15). */}
           {/* Assistant was never in this list, same as the Zone: reached from

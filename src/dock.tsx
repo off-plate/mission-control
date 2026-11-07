@@ -13,13 +13,11 @@ import { lastFace } from './ideasswitch'
 import { usePromptWindow } from './promptwindow'
 import type { PageId } from './types'
 
-/* The pages that left the header (2026-11-07), bottom of this list = closest to the button. */
+/* Pages that live in the floating button (2026-11-07: MyMind and Bills left the header, Reminders is new).
+   Bottom of this list = closest to the button. */
 const DOCK_PAGES: { id: PageId; label: string; icon: React.ReactNode }[] = [
   { id: 'mymind', label: 'MyMind', icon: <Icon.DockBookmark size={20} /> },
-  { id: 'people', label: 'People', icon: <Icon.DockPeople size={20} /> },
   { id: 'bills', label: 'Bills', icon: <Icon.DockWallet size={20} /> },
-  { id: 'ideas', label: 'Ideas', icon: <Icon.DockBulb size={20} /> },
-  { id: 'notes', label: 'Notes', icon: <Icon.DockNote size={20} /> },
   { id: 'reminders', label: 'Reminders', icon: <Icon.DockChecklist size={20} /> },
 ]
 

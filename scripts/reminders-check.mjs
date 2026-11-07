@@ -34,18 +34,18 @@ for (const [engine, size] of [[chromium, { width: 1440, height: 900 }], [chromiu
   await page.goto(URL); await page.waitForTimeout(1500)
   const blob = () => page.evaluate((K) => JSON.parse(localStorage.getItem(K) ?? '{}'), KEY)
 
-  await step(`${tag}: header keeps only Jarvis, Zone and Jar`, async () => {
+  await step(`${tag}: header keeps Jarvis, Zone, Jar, Notes, Ideas, People; Bills and MyMind left`, async () => {
     const labels = await page.locator('.topbar-right .btn-sq:visible').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
-    for (const gone of ['Notes', 'Ideas', 'People', 'Bills', 'MyMind', 'Invoices']) assert.ok(!labels.includes(gone), `${gone} still in header: ${labels}`)
-    for (const kept of [/Jarvis/i, /Zone/, /^Jar$/]) assert.ok(labels.some((l) => kept.test(l)), `${kept} missing: ${labels}`)
-    assert.equal(labels.length, 3, `header squares: ${labels}`)
+    for (const gone of ['Bills', 'MyMind', 'Invoices']) assert.ok(!labels.includes(gone), `${gone} still in header: ${labels}`)
+    for (const kept of [/Jarvis/i, /Zone/, /^Jar$/, /^Notes$/, /^Ideas$/, /^People$/]) assert.ok(labels.some((l) => kept.test(l)), `${kept} missing: ${labels}`)
   })
-  await step(`${tag}: floating button shows every page, no More, stack clear of the header`, async () => {
+  await step(`${tag}: floating button holds MyMind, Bills, Reminders, no More, stack clear of the header`, async () => {
     await page.locator('.dock-fab').hover(); await page.waitForTimeout(500)
     if (!(await page.locator('.dock-menu').count())) { await page.locator('.dock-fab').click(); await page.waitForTimeout(500) }
     assert.equal(await page.locator('.dock-more-btn').count(), 0, 'More is still there')
     const labels = await page.locator('.dock-menu .dock-item-label').allTextContents()
-    for (const want of ['Reminders', 'Notes', 'Ideas', 'Bills', 'People', 'MyMind', 'Skills', 'Watchless']) assert.ok(labels.some((l) => l.startsWith(want)), `${want} missing: ${labels}`)
+    for (const want of ['Reminders', 'Bills', 'MyMind', 'Skills', 'Watchless']) assert.ok(labels.some((l) => l.startsWith(want)), `${want} missing: ${labels}`)
+    for (const gone of ['Notes', 'Ideas', 'People']) assert.ok(!labels.some((l) => l.startsWith(gone)), `${gone} should stay in the header: ${labels}`)
     assert.ok(await page.locator('.dock-mini [aria-label^="Settings"]').count(), 'no Settings')
     const top = (await page.locator('.dock-menu').boundingBox()).y
     const hb = await page.locator('.topbar, header').first().boundingBox()
@@ -55,6 +55,11 @@ for (const [engine, size] of [[chromium, { width: 1440, height: 900 }], [chromiu
   await step(`${tag}: Reminders opens from the floating button`, async () => {
     await page.locator('.dock-item--page', { hasText: 'Reminders' }).click(); await page.waitForTimeout(800)
     await page.locator('.rem-page').waitFor()
+    const hb = await page.locator('.topbar, header').first().boundingBox()
+    const t = await page.locator('.rem-h1').boundingBox()
+    const pane = await page.locator('.rem-pane').boundingBox()
+    assert.ok(t.y - (hb.y + hb.height) >= 20, `title only ${t.y - (hb.y + hb.height)}px under the header`)
+    assert.ok(pane.y - (hb.y + hb.height) >= 20, `list pane only ${pane.y - (hb.y + hb.height)}px under the header`)
   })
   await step(`${tag}: add to Today, it gets a time and counts`, async () => {
     await page.locator('.rem-tile', { hasText: 'Today' }).click()

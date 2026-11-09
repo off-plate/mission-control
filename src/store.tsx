@@ -393,6 +393,8 @@ interface Store extends PersistedState {
   deleteTask: (id: string) => void
   /** Attach generated steps to an existing task; its estimate becomes their sum. */
   setSubtasks: (taskId: string, subs: { title: string; estimateMin: number }[]) => void
+  /** Ask for a fresh estimate of one task now (the model reads the title; the rule of thumb catches a failed call). */
+  estimateNow: (taskId: string) => Promise<void>
   /** Set a task's own estimate (used by the per-task estimate action). */
   setEstimate: (taskId: string, minutes: number) => void
   /** The Pomodoro block running right now, synced across devices. Null
@@ -1714,6 +1716,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     deleteTask: plannerSlice.deleteTask,
     setSubtasks: plannerSlice.setSubtasks,
+    estimateNow: async (taskId) => {
+      const t = tasks.find((x) => x.id === taskId)
+      if (!t || t.subtasks?.length) return
+      let min: number
+      try { min = (await estimateTask(t.title, t.category)) ?? estimateFor(t.title, t.category).minutes }
+      catch { min = estimateFor(t.title, t.category).minutes }
+      plannerSlice.setEstimate(taskId, min)
+    },
     setEstimate: plannerSlice.setEstimate,
     activeFocus,
     setActiveFocus,

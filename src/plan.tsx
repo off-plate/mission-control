@@ -264,6 +264,23 @@ function EstimateChip({ task }: { task: Task }) {
   )
 }
 
+/* The estimate button on a Line card (his ask, 2026-11-07: "instead of the three dots, keep the estimation
+   icon that estimates the time, and that's it"). One tap asks for a fresh estimate of the task. A task
+   with steps is the sum of its steps, so there it only says so. */
+function EstimateBtn({ task }: { task: Task }) {
+  const { estimateNow } = useStore()
+  const [busy, setBusy] = useState(false)
+  const fromSteps = !!task.subtasks?.length
+  const mins = taskMinutes(task)
+  const label = fromSteps ? 'The time comes from the steps' : busy ? 'Estimating' : isEstimated(task) ? `Estimate again, now ${fmtDuration(mins)}` : 'Estimate the time'
+  return (
+    <button className={`pl-est${busy ? ' is-busy' : ''}`} disabled={fromSteps || busy} aria-label={label} title={label}
+      onClick={() => { setBusy(true); void estimateNow(task.id).finally(() => setBusy(false)) }}>
+      <Icon.Hourglass size={18} />
+    </button>
+  )
+}
+
 /* Estimating is automatic (store.tsx), so the only action left on a task row is
    starting a focus block. */
 function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
@@ -1562,7 +1579,7 @@ export function PlanPage() {
             isToday={dayOffset === 0}
             hueStyle={hueStyle}
             tag={(t) => <TagMark project={markOf(t)} onPick={pickTag} />}
-            menu={dayMenu}
+            estimate={(t) => <EstimateBtn task={t} />}
             check={(t) => { if (t.done) { toggleTask(t.id); return } setLogging(t.id) }}
             log={(t) => (logging === t.id ? (
               <div className="pl-log"><ActualLog est={taskMinutes(t)} tracked={trackedFor(t.title)} onLog={(m) => { logActual(t.id, m); setLogging(null) }} onSkip={() => { toggleTask(t.id); setLogging(null) }} /></div>

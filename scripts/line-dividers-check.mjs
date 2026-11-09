@@ -45,6 +45,16 @@ for (const engine of [chromium, webkit]) {
     assert.equal(await page.locator('.pf-list').count(), 0, 'list view still drawn')
     assert.equal(await page.getByRole('button', { name: /^List$/ }).count(), 0, 'a List button is still on the page')
   })
+  await step(`${engine.name()}: no three-dot menu on a card, an estimate button instead that re-estimates`, async () => {
+    assert.equal(await page.locator('.pl-card [aria-label^="Options for"]').count(), 0, 'the menu is still on the cards')
+    const card = page.locator('.pl-task').filter({ has: page.getByText('Evening task', { exact: true }) })
+    await page.evaluate((K) => { const s = JSON.parse(localStorage.getItem(K)); s.tasks.find((t) => t.id === 'ln-4').estimateMin = 7; localStorage.setItem(K, JSON.stringify(s)) }, KEY)
+    const btn = card.locator('.pl-est'); assert.equal(await btn.count(), 1, 'no estimate button')
+    assert.match(await btn.getAttribute('aria-label'), /Estimate/i)
+    await btn.click(); await page.waitForTimeout(1500)
+    const t = await page.evaluate((K) => JSON.parse(localStorage.getItem(K)).tasks.find((x) => x.id === 'ln-4'), KEY)
+    assert.ok(t.estimated && t.estimateMin > 0, JSON.stringify({ e: t.estimated, m: t.estimateMin }))
+  })
   await step(`${engine.name()}: one divider per part of the day, in order`, async () => {
     const labels = await page.locator('.pl-slot b').allTextContents()
     assert.deepEqual(labels, ['Morning', 'Noon', 'Afternoon', 'Evening'], `got ${labels}`)

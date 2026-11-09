@@ -13302,3 +13302,12 @@ button.pf-steps { border: 0; background: none; padding: 0; font: inherit; font-s
 .step-add-go { border: 0; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 0.8125rem; font-weight: 700; background: var(--surface-2); color: var(--ink); cursor: pointer; }
 .step-add-go:disabled { opacity: 0.45; cursor: default; }
 .step-add-go:not(:disabled):hover { background: var(--accent-fill, var(--accent)); color: var(--accent-ink); }
+
+/* The estimate button on a Line card (2026-11-07), where the three dots used to be. */
+.pl-est { width: 36px; height: 36px; border: 0; border-radius: 10px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.pl-est:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.pl-est:active:not(:disabled) { transform: scale(0.94); }
+.pl-est:disabled { cursor: default; opacity: 0.45; }
+.pl-est.is-busy svg { animation: pl-est-spin 1s linear infinite; }
+@keyframes pl-est-spin { to { transform: rotate(180deg); } }
+@media (prefers-reduced-motion: reduce) { .pl-est.is-busy svg { animation: none; opacity: 0.5; } }

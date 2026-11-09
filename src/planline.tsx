@@ -23,13 +23,13 @@ const hOf = (d: number) => Math.max(46, Math.min(240, Math.round(d * 0.8)))
    read dataTransfer, and the length of the thing decides where it fits. */
 let dragging: string | null = null
 
-export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, focus, steps, stepsToggle, flashId, onPlace, onAdd }: {
+export function PlanLine({ day, all, isToday, hueStyle, tag, estimate, check, log, focus, steps, stepsToggle, flashId, onPlace, onAdd }: {
   day: Task[]
   all: Task[]
   isToday: boolean
   hueStyle: (t: Task) => CSSProperties | undefined
   tag: (t: Task) => ReactNode
-  menu: (t: Task) => ReactNode
+  estimate: (t: Task) => ReactNode
   check: (t: Task) => void
   log: (t: Task) => ReactNode
   focus: (t: Task) => (() => void) | undefined
@@ -196,7 +196,7 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, menu, check, log, f
                     <Icon.Play size={14} /> Focus
                   </button>
                 )}
-                {menu(t)}
+                {estimate(t)}
               </div>
               {steps(t) && <div className="pl-steps">{steps(t)}</div>}
               {nowLine(live ? pct / 100 : null, H)}

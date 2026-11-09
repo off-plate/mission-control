@@ -314,9 +314,16 @@ export function renameProject(b: Blob, nameOrId: string, to: string): { id: stri
 
 export const DEV = 'claude'
 
-export function addNote(b: Blob, i: { body: string; space?: 'personal' | 'work'; folderId?: string }): { id: string; text: string } {
+export function addNote(b: Blob, i: { body: string; space?: 'personal' | 'work'; folderId?: string; evenIfExists?: boolean }): { id: string; text: string } {
   const body = i.body ?? ''
   if (!body.trim()) throw new McError('A note needs some text.')
+  /* A second note with the same title is almost always "update the note" done the wrong way (his report,
+     2026-11-09: every adjustment made a new copy). Refuse and point at the edit tools. */
+  if (!i.evenIfExists) {
+    const title = fold(noteTitle(body))
+    const twin = arr(b, 'notes').find((n) => fold(String(n.title ?? '')) === title)
+    if (twin) throw new McError(`A note titled "${twin.title}" already exists (id ${twin.id}). To change it, use edit_note_text (swap or remove a piece), append_to_note (add to the end) or replace_note (rewrite it all), not a new note. If he really wants a second note with this title, call add_note again with even_if_exists true.`)
+  }
   const space = i.space ?? 'personal'
   const folderId = i.folderId ?? `nf-space-${space}`
   if (i.folderId && !/^nf-space-/.test(i.folderId) && !arr(b, 'noteFolders').some((f) => f.id === i.folderId)) {
@@ -352,6 +359,25 @@ export function replaceNote(b: Blob, ref: Ref, body: string): { id: string; text
   if (old !== body) n.hist = [...(Array.isArray(n.hist) ? n.hist : []), bodyHash(old)].slice(-HIST)
   n.body = body; n.title = noteTitle(body); n.dev = DEV; n.updatedAt = Date.now()
   return { id: n.id, text: `Rewrote note "${n.title}".` }
+}
+
+/** Change a note IN PLACE: swap one exact piece of its text for another (an empty replacement removes the
+ *  piece). The old body's hash goes into hist like any other edit, so another device sees an ordinary
+ *  edit and not a conflict. */
+export function editNoteText(b: Blob, ref: Ref, p: { find: string; replace: string; all?: boolean }): { id: string; text: string } {
+  const n = findNote(b, ref)
+  const find = String(p.find ?? '')
+  if (!find) throw new McError('find is empty. Pass the exact piece of the note to change (read it with get_note and copy it).')
+  const old = String(n.body ?? '')
+  const parts = old.split(find)
+  const hits = parts.length - 1
+  if (hits === 0) throw new McError(`That text is not in the note "${n.title}". Read it with get_note and copy the exact piece, including punctuation and line breaks. Nothing was changed.`)
+  if (hits > 1 && !p.all) throw new McError(`That text appears ${hits} times in "${n.title}". Include more of the surrounding text so it matches once, or pass replace_all true to change every one. Nothing was changed.`)
+  const body = parts.join(String(p.replace ?? ''))
+  if (!body.trim()) throw new McError('That would leave the note empty. Delete the note instead if he wants it gone.')
+  if (body !== old) n.hist = [...(Array.isArray(n.hist) ? n.hist : []), bodyHash(old)].slice(-HIST)
+  n.body = body; n.title = noteTitle(body); n.dev = DEV; n.updatedAt = Date.now()
+  return { id: n.id, text: `Edited note "${n.title}"${hits > 1 ? ` (${hits} places)` : ''}.` }
 }
 
 export function deleteNote(b: Blob, ref: Ref): { id: string; text: string } {

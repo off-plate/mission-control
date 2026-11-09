@@ -19,7 +19,7 @@ rows. The library's service-role client is never used.
 - `ops-<area>.ts` + `tools-<area>.ts`  one pair per area; `index.ts` registers them all (MODULES)
 - tests: `tools/mcp-*-test.mjs` (each area, `mcp-all-test.mjs` registers everything together), kit in `tools/mcp-test-kit.mjs`
 
-## Areas (156 tools)
+## Areas (157 tools)
 - core: overview, day, tasks (add, change, finish, reopen, steps, delete), projects, notes, browse
 - tasks: bulk add / complete / reopen / update / delete, up to 60 at a time, all or nothing
 - growth: habits (every kind), routines, quit habits and slips, amounts, bulk tick, the daily review

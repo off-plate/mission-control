@@ -37,6 +37,9 @@ create table if not exists mc_revolut_sync (
   range_to          date,
   current_displayed numeric(14, 2)                -- the figure the Revolut home screen showed, pending included
 );
+-- The pocket balances Revolut itself showed at sync time: [{ "name": "Savings", "balance": 8440.42 }, ...].
+-- The statement CSV cannot give these (no Subscriptions/Burner pockets, pending ignored), so they are read off the screen.
+alter table mc_revolut_sync add column if not exists pockets jsonb;
 
 -- His categorisation rules: first match by prio wins. Rows live in the database, not in this repo.
 create table if not exists mc_revolut_rules (

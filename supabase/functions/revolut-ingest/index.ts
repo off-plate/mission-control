@@ -9,6 +9,7 @@
    transaction comes round again (pending turns into completed).
 
      { action: 'ingest', rows: [...], final?: { range_from, current_displayed, changed } }
+     { action: 'pockets', pockets: [{ name, balance }] }                          pocket balances as Revolut shows them
      { action: 'rules',  rules: [{ pattern, category, internal, prio }] }   replaces his rules
      { action: 'recategorize' }                                              re-applies the rules to every row
 
@@ -119,6 +120,14 @@ Deno.serve(async (req) => {
     return json({ recategorized: changed })
   }
 
+  if (body.action === 'pockets') {
+    const list = ((body.pockets ?? []) as { name?: string; balance?: number | string }[]).slice(0, 20)
+      .map((p) => ({ name: clean(p?.name, 40), balance: num(p?.balance) })).filter((p) => p.name && p.balance !== null)
+    if (!list.length) return json({ error: 'no pockets' }, 400)
+    const { error } = await sb.from('mc_revolut_sync').update({ pockets: list }).eq('owner', owner)
+    return error ? json({ error: error.message }, 500) : json({ pockets: list.length, total: list.reduce((a, p) => a + (p.balance as number), 0) })
+  }
+
   if (body.action === 'ingest') {
     const rows = (body.rows ?? []) as InRow[]
     if (!Array.isArray(rows) || !rows.length) return json({ error: 'no rows' }, 400)
@@ -155,7 +164,11 @@ Deno.serve(async (req) => {
       if (error) return json({ error: error.message, at: i }, 500)
     }
     const after = await countRows(owner)
-    const fin = body.final as { range_from?: string; current_displayed?: number | string; changed?: number } | undefined
+    const fin = body.final as { range_from?: string; current_displayed?: number | string; changed?: number; pockets?: { name?: string; balance?: number | string }[] } | undefined
+    /* Pocket balances as Revolut shows them, read off the screen by the skill. Optional: no list, no change. */
+    const pockets = Array.isArray(fin?.pockets)
+      ? fin!.pockets!.slice(0, 20).map((p) => ({ name: clean(p?.name, 40), balance: num(p?.balance) })).filter((p) => p.name && p.balance !== null)
+      : null
     if (fin) {
       const { data: last } = await sb.from('mc_revolut_tx').select('day').eq('owner', owner).order('started', { ascending: false }).limit(1)
       const { error } = await sb.from('mc_revolut_sync').upsert({
@@ -163,6 +176,7 @@ Deno.serve(async (req) => {
         rows_changed: Number.isFinite(Number(fin.changed)) ? Number(fin.changed) : after - before,
         range_from: /^\d{4}-\d{2}-\d{2}$/.test(fin.range_from ?? '') ? fin.range_from : null,
         range_to: last?.[0]?.day ?? null, current_displayed: num(fin.current_displayed),
+        ...(pockets?.length ? { pockets } : {}),
       }, { onConflict: 'owner' })
       if (error) return json({ error: error.message }, 500)
     }

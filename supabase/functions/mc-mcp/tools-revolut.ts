@@ -37,11 +37,10 @@ export function register(r: Reg): void {
     const from = addDays(today, -29)
     const [bal, months, cats, sync, pending] = await Promise.all([
       rpc('revolut_balances'), rpc('revolut_by_month', { months: 4 }), rpc('revolut_by_category', { from_day: from, to_day: today }),
-      (r.db as any).from('mc_revolut_sync').select('synced_at, rows_total, range_to, current_displayed').maybeSingle(),
+      (r.db as any).from('mc_revolut_sync').select('synced_at, rows_total, range_to, current_displayed, pockets').maybeSingle(),
       (r.db as any).from('mc_revolut_tx').select('started, amount, description, product').eq('state', 'PENDING').order('started', { ascending: false }).limit(10),
     ])
-    const balances = (must(bal) as { product: string; balance: number }[]).map((b) => ({ pocket: b.product, balance: money(b.balance) }))
-    const ms = (must(months) as { month: string; income: number; spending: number; net: number }[])
+        const ms = (must(months) as { month: string; income: number; spending: number; net: number }[])
     const thisMonth = today.slice(0, 7)
     const full = ms.filter((m) => m.month.slice(0, 7) !== thisMonth).slice(0, 3)
     const avg = (k: 'income' | 'spending' | 'net') => full.length ? money(full.reduce((s, m) => s + Number(m[k]), 0) / full.length) : null
@@ -51,12 +50,16 @@ export function register(r: Reg): void {
       income: money(catRows.reduce((s, c) => s + Number(c.income), 0)),
       spending: money(catRows.reduce((s, c) => s + Number(c.spending), 0)),
     }
-    const syncRow = must(sync) as { synced_at: string; rows_total: number; range_to: string | null; current_displayed: number | null } | null
+    const syncRow = must(sync) as { synced_at: string; rows_total: number; range_to: string | null; current_displayed: number | null; pockets: { name: string; balance: number }[] | null } | null
+    /* The pocket list Revolut itself showed at sync wins. The statement's running balance is only the fallback: it misses pockets and ignores pending. */
+    const fromScreen = syncRow?.pockets?.length ? syncRow.pockets.map((p) => ({ pocket: p.name, balance: money(Number(p.balance)) })) : null
+    const balances = fromScreen ?? (must(bal) as { product: string; balance: number }[]).map((b) => ({ pocket: b.product, balance: money(b.balance) }))
     const hours = syncRow ? Math.round((Date.now() - Date.parse(syncRow.synced_at)) / 3_600_000) : null
     return {
       currency: 'CZK',
       synced_at: syncRow?.synced_at ?? null, hours_old: hours, data_up_to: syncRow?.range_to ?? null,
       stale: hours === null || hours > 72,
+      balances_source: fromScreen ? 'Revolut pocket list at last sync (pending included)' : 'statement running balance (may be wrong, run /revolut-sync)',
       balances, total: money(balances.reduce((s, b) => s + b.balance, 0)),
       current_shown_by_revolut_at_sync: syncRow?.current_displayed == null ? null : money(syncRow.current_displayed),
       pending: (must(pending) as { started: string; amount: number; description: string; product: string }[]).map((p) => ({ at: p.started, amount: money(p.amount), description: safeText(p.description), pocket: p.product })),

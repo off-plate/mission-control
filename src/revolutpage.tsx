@@ -18,7 +18,7 @@ import './revolut.css'
 interface Tx { id: string; product: string; type: string; started: string; description: string; amount: number; state: string; balance: number | null; category: string; internal: boolean }
 interface Bal { product: string; balance: number; as_of: string }
 interface Month { month: string; income: number; spending: number; net: number; n: number }
-interface Sync { synced_at: string; rows_total: number; range_to: string | null; current_displayed: number | null }
+interface Sync { synced_at: string; rows_total: number; range_to: string | null; current_displayed: number | null; pockets?: { name: string; balance: number }[] | null }
 
 const PAGE = 300
 const STALE_HOURS = 72
@@ -76,7 +76,7 @@ export function RevolutPage() {
       if (!c || !acc) return
       const [b, m, s] = await Promise.all([
         c.rpc('revolut_balances'), c.rpc('revolut_by_month', { months: 12 }),
-        c.from('mc_revolut_sync').select('synced_at, rows_total, range_to, current_displayed').maybeSingle(),
+        c.from('mc_revolut_sync').select('synced_at, rows_total, range_to, current_displayed, pockets').maybeSingle(),
       ])
       if (!live) return
       if (b.error || m.error) setErr((b.error ?? m.error)!.message)
@@ -118,8 +118,11 @@ export function RevolutPage() {
     return () => window.clearTimeout(t)
   }, [fetchRows, q])
 
-  const total = useMemo(() => bal.reduce((s, b) => s + b.balance, 0), [bal])
-  const byPocket = useMemo(() => POCKETS.map((p) => bal.find((b) => b.product === p)).filter((b): b is Bal => !!b), [bal])
+  /* Pockets as Revolut showed them at sync win; the statement's running balance is only the fallback. */
+  const byPocket = useMemo<Bal[]>(() => sync?.pockets?.length
+    ? sync.pockets.map((p) => ({ product: p.name, balance: Number(p.balance), as_of: sync.synced_at }))
+    : POCKETS.map((p) => bal.find((b) => b.product === p)).filter((b): b is Bal => !!b), [bal, sync])
+  const total = useMemo(() => byPocket.reduce((s, b) => s + b.balance, 0), [byPocket])
   const staleH = sync ? (Date.now() - Date.parse(sync.synced_at)) / 3_600_000 : null
   const stale = staleH !== null && staleH > STALE_HOURS
 

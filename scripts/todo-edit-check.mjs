@@ -1,6 +1,6 @@
 /* An open row menu must paint ABOVE the rows after it (his report 2026-11-09: the to-do list's menu was drawn under
    the next rows, text on top of text). Real page, real saved state, wide and phone width, Chromium and WebKit.
-   Run after `npm run build`: node scripts/menu-layer-check.mjs   Shots: /tmp/mc-menu-shots/ */
+   Run after `npm run build`: node scripts/todo-edit-check.mjs   Shots: /tmp/mc-menu-shots/ */
 import { chromium, webkit } from 'playwright'
 import { createServer } from 'http'
 import { readFileSync, existsSync, mkdirSync } from 'fs'
@@ -41,28 +41,16 @@ for (const [engine, size, label] of [[chromium, { width: 1440, height: 900 }, 'd
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /^\s*Plan\s*$/i.test(x.textContent)); b && b.click() })
   await page.waitForTimeout(1500)
   if (label === 'narrow') { const seg = page.locator('.seg-phone button').nth(1); if (await seg.isVisible()) { await seg.click(); await page.waitForTimeout(500) } }
-  await step(`${tag}: an open to-do menu sits above the rows after it`, async () => {
-    await page.screenshot({ path: `${SHOTS}/${tag.replace(/ /g, '-')}-before.png` })
-    const row = page.locator('.todo-item').nth(1)
-    await row.locator('.kebab').click({ force: true }); await page.waitForTimeout(400)
-    const menu = page.locator('.kebab-menu').first()
-    const r = await menu.boundingBox()
-    /* Sample points inside the menu: the element on top there must be the menu (or inside it), not a task row. */
-    const bad = await page.evaluate(({ x, y, w, h }) => {
-      const out = []
-      for (const fx of [0.2, 0.5, 0.8]) for (const fy of [0.15, 0.4, 0.65, 0.9]) {
-        const el = document.elementFromPoint(x + w * fx, y + h * fy)
-        if (el && !el.closest('.kebab-menu')) out.push((el.className || el.tagName) + ': ' + (el.textContent || '').slice(0, 30))
-      }
-      return out
-    }, { x: r.x, y: r.y, w: r.width, h: Math.min(r.height, 300) })
+  await step(`${tag}: a to-do row has a pencil that opens Edit, and no three-dot menu`, async () => {
+    assert.equal(await page.locator('.todo-item .kebab').count(), 0, 'the three-dot menu is still on to-do rows')
+    assert.equal(await page.locator('.todo-item .pf-edit').count(), 8, 'every to-do row has a pencil')
     await page.screenshot({ path: `${SHOTS}/${tag.replace(/ /g, '-')}.png` })
-    assert.deepEqual(bad, [], `things paint over the menu: ${bad.slice(0, 3)}`)
+    await page.locator('.todo-item').nth(1).locator('.pf-edit').click(); await page.waitForTimeout(500)
+    assert.equal(await page.locator('.sheet #et-title').inputValue(), 'Kočičí kavárna: set up thing number 1')
+    await page.keyboard.press('Escape'); await page.waitForTimeout(300)
   })
   await step(`${tag}: the #project suggestions in the Edit sheet are fully visible, not cut at the sheet edge`, async () => {
-    await page.keyboard.press('Escape'); await page.waitForTimeout(200)
-    await page.locator('.todo-item').nth(1).locator('.kebab').click({ force: true }); await page.waitForTimeout(300)
-    await page.locator('.kebab-menu button', { hasText: /^Edit$/ }).first().click(); await page.waitForTimeout(500)
+    await page.locator('.todo-item').nth(1).locator('.pf-edit').click(); await page.waitForTimeout(500)
     const field = page.locator('.sheet #et-title'); await field.fill('Jakub: #'); await page.waitForTimeout(400)
     const items = page.locator('.tagpop button'); const n = await items.count()
     assert.ok(n >= 2, `only ${n} suggestions`)

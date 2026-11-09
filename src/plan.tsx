@@ -1377,26 +1377,12 @@ export function PlanPage() {
             onClick={() => moveTasksToToday([t.id], planDay)}>
             <Icon.ChevronRight size={16} />
           </button>
-          <Dropdown label={`Options for ${t.title}`}>
-            <button role="menuitem" onClick={() => setEditingTask(t)}>Edit</button>
-            <button role="menuitem" onClick={() => setBreakdownFor(t)}>Break it down</button>
-            <button role="menuitem" onClick={() => openSteps(t.id)}>Add a step</button>
-            {coarse && (
-              <>
-                <span className="kebab-head">Plan for a day</span>
-                {Array.from({ length: PLAN_AHEAD_DAYS + 1 }, (_, n) => n).map((n) => (
-                  <button key={n} role="menuitem" onClick={() => { moveTasksToToday([t.id], dayPlus(n)); setDayOffset(n) }}>
-                    Move to {n <= 1 ? offsetWord(n).toLowerCase() : shortDay(dayPlus(n))}
-                  </button>
-                ))}
-              </>
-            )}
-            {goalMenu(t)}
-            {projectMenu(t)}
-            {spaceMenu(t)}
-            <span className="kebab-sep" />
-            <button role="menuitem" className="danger" onClick={() => deleteTask(t.id)}>Delete</button>
-          </Dropdown>
+          {/* The to-do row's menu is one pencil that opens the Edit sheet (his ask, 2026-11-09: "keep just the pencil
+              icon which would allow to edit, nothing else"). Break it down, steps, project, goal and delete live
+              in the sheet and the task's own screens, not in a long menu. */}
+          <button className="pf-edit" aria-label={`Edit ${t.title}`} title="Edit" onClick={() => setEditingTask(t)}>
+            <Icon.Edit size={16} />
+          </button>
           </span>
           </div>
         </div>

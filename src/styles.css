@@ -13322,3 +13322,8 @@ button.pf-steps { border: 0; background: none; padding: 0; font: inherit; font-s
    it cut them off at its edge (his report 2026-11-09: only two suggestions showed). While the field is in the body the
    body lets them show; these sheets are short, so nothing else depends on the clip. */
 .sheet-body:has(.tagpop) { overflow: visible; }
+
+/* The pencil on a to-do row, where the three dots used to be (2026-11-09). */
+.pf-edit { width: 36px; height: 36px; border: 0; border-radius: 10px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; flex: none; transition: background-color .15s ease, color .15s ease; }
+.pf-edit:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.pf-edit:active { transform: scale(0.94); }

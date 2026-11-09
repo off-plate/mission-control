@@ -13311,3 +13311,14 @@ button.pf-steps { border: 0; background: none; padding: 0; font: inherit; font-s
 .pl-est.is-busy svg { animation: pl-est-spin 1s linear infinite; }
 @keyframes pl-est-spin { to { transform: rotate(180deg); } }
 @media (prefers-reduced-motion: reduce) { .pl-est.is-busy svg { animation: none; opacity: 0.5; } }
+
+/* An open row menu paints above the rows after it (his report 2026-11-09: the to-do list's menu was drawn under
+   the next rows, text on text). The old rule lifted `.todo-row > .kebab-wrap`, which stopped matching when the menu
+   moved one level deeper into `.pf-rowline`. Lifting whichever row holds an open menu fixes every row type at once. */
+.todo-item:has(.kebab-wrap.is-open), .today-item:has(.kebab-wrap.is-open), .pl-row:has(.kebab-wrap.is-open),
+.rowitem:has(.kebab-wrap.is-open), .ptask:has(.kebab-wrap.is-open), .nt-row:has(.kebab-wrap.is-open) { position: relative; z-index: 50; }
+
+/* The #project suggestions in a sheet (the Edit task sheet) hang below the field. The sheet body scrolls on its own, so
+   it cut them off at its edge (his report 2026-11-09: only two suggestions showed). While the field is in the body the
+   body lets them show; these sheets are short, so nothing else depends on the clip. */
+.sheet-body:has(.tagpop) { overflow: visible; }

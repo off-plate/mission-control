@@ -21,7 +21,7 @@
    site, which is exactly why it read like every other focus timer. */
 
 import { Orb } from './orb'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useClockStamp, useFirstMove, useOpenToday, usePhone } from './ui'
 import { usePomodoro } from './pomodoro'
 import { ZonePlayer, ZoneQueue } from './zoneplayer'
@@ -297,7 +297,6 @@ function ZoneTask() {
     pomo.phase === 'break' ? 1 - pomo.secondsLeft / Math.max(1, pomo.breakMin * 60) :
     pomo.phase === 'await' ? 1 : 0
 
-  const label = { running: 'Focus', paused: 'Paused', break: 'Break', done: 'Done', idle: activeTask ? 'Ready' : 'Nothing lined up' }[phaseState]
 
   const title =
     pomo.phase === 'focus' || pomo.phase === 'await' ? (pomo.focusLabel ?? 'Focus block') :

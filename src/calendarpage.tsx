@@ -56,7 +56,6 @@ function linkify(text: string): ReactNode[] {
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-const keyOf = (y: number, m: number, d: number) => localDateKey(new Date(y, m, d))
 
 function dayLabel(day: string, today: string): string {
   if (day === today) return 'Today'

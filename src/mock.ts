@@ -18,8 +18,6 @@ export const SPACE_LABELS: Record<SpaceId, string> = {
   work: 'Big Time',
 }
 
-/** Seed ages, so the ageing detector has real history on a fresh install. */
-const ago = (d: number) => { const x = new Date(); x.setDate(x.getDate() - d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` }
 
 export const MOCK_TASKS: Task[] = []
 

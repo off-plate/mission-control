@@ -1,4 +1,4 @@
-import type { SpaceId, TaskCategory } from './core'
+import type { SpaceId } from './core'
 
 /** The factual look at an avoided thing: what it is, what it takes, what ignoring it costs. */
 export interface CoachFacts {

@@ -90,7 +90,6 @@ export function PromptsPage() {
   }, [open])
 
   const sentCount = prompts.length - open.length
-  const nodeName = sel.sent ? 'Sent' : sel.session ?? sel.project ?? 'the backlog'
 
   const addQuick = () => {
     const text = quick.trim()

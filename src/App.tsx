@@ -1,14 +1,11 @@
-import { Orb } from './orb'
 import { JarBar, JAR_PAGES } from './cookiejarnav'
-import { ProjectMark, WorkspacePick, usePhone } from './ui'
+import { WorkspacePick, usePhone } from './ui'
 import { usePromptWindow } from './promptwindow'
 import { useReminderAlerts } from './reminderalerts'
 import { lastFace } from './ideasswitch'
 import { MiniTitle } from './minititle'
-import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { exceptionsFor, globalExceptions } from './exceptions'
-import { SPACE_LABELS } from './mock'
 import { TodayPage } from './today'
 import { PlanPage } from './plan'
 import { ProjectsPage } from './projects'
@@ -22,6 +19,13 @@ import { Helmet } from './helmet'
 import { TimelinePage } from './timeline'
 import * as Icon from './icons'
 import { ZonePage, useZoneDepth } from './zone'
+import { useStore } from './store'
+import { CLASSIC_LOOK, SKINS, useSkin } from './skins'
+import { openInShell } from './shells/nav'
+import { isReadOnly } from './store'
+import { PROJECT_OFFPLATE, type PageId, type ViewId } from './types'
+import { PageBoundary, SyncPip } from './appshell/chrome'
+import { PageNav } from './appshell/nav'
 /* These seven are never the first thing on screen (boot always lands on
    Today) and, unlike Notes/Bills/Timeline, nothing outside App.tsx reaches
    into them -- confirmed 2026-09-04, each has exactly one importer. Lazy
@@ -63,109 +67,6 @@ const SHELL_VIEW: Partial<Record<PageId, string>> = {
   zone: 'zone', assistant: 'jarvis', health: 'health', gym: 'gym', board: 'why', apps: 'apps',
 }
 const PeoplePage = lazy(() => import('./people').then((m) => ({ default: m.PeoplePage })))
-import { useStore } from './store'
-import { CLASSIC_LOOK, SKINS, useSkin } from './skins'
-import { openInShell } from './shells/nav'
-import { ago, describe, useSyncStatus } from './sync'
-import { isReadOnly } from './store'
-import { PROJECT_OFFPLATE, SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
-
-/* Is this thing up to date, and where did the last change come from.
-
-   He asked for it after working on the laptop, editing on the phone, and having
-   no way to tell whether the two had met. The answer was already in the app, on
-   the Settings page, which is exactly where nobody looks to find out whether
-   something that should be automatic is working.
-
-   Two facts, one line. Ordinarily it says when the state last reached the
-   server. When a change arrived from somewhere else it says so instead, and
-   keeps saying so until he writes something here, because "your phone's edit
-   landed" is the news and "synced" is the assumption.
-
-   Alert by exception on the phone: at that width the ordinary case is a dot
-   with no words, and the words come back the moment there is something to say. */
-function SyncPip() {
-  const sync = useSyncStatus()
-  const { syncOrigin } = useStore()
-
-  const settled = sync.phase === 'synced' || sync.phase === 'off'
-  /* A pending or failed push is about THIS device and outranks the news from
-     another one: telling him his phone's edit arrived while his own is stuck in
-     an outbox would be true and useless. */
-  const fromElsewhere = Boolean(syncOrigin) && settled
-  const text = fromElsewhere && syncOrigin
-    ? `Updated from ${syncOrigin.name} ${ago(syncOrigin.at)}`
-    : describe(sync)
-
-  /* The dot answers one question only: is sync healthy. A change arriving from
-     his phone is not a warning and not a problem, so it is the same green as an
-     ordinary sync and the WORDS carry the difference. The alternative was a
-     fifth colour for "news", and `.status-dot.manual` is already redefined
-     further down the stylesheet to the same amber as `warn`, so reusing it
-     would have made "your phone's edit landed" look exactly like "still
-     saving". */
-  const tone = sync.phase === 'off' ? 'off'
-    : sync.phase === 'error' || sync.phase === 'offline' ? 'alert'
-    : sync.phase === 'saving' || sync.phase === 'waiting' ? 'warn'
-    : 'connected'
-
-  /* Quiet on a phone means the dot alone. News from another device is exactly
-     the case that has earned its words, so it is never quiet. */
-  const quiet = tone === 'connected' && !fromElsewhere
-
-  return (
-    <span className="syncpip" data-quiet={quiet || undefined} title={sync.detail || text}>
-      {/* The dot is an orb (his ask, 2026-10-04): a still globe when all is
-          saved, moving only while it saves, tinted when something is wrong. */}
-      <span className="syncorb" title={text}>
-        <Orb state={tone === 'warn' ? 'connecting' : 'searching'} size={22} paused={tone !== 'warn'}
-          color={tone === 'alert' ? '#C2412D' : undefined} label={text} />
-      </span>
-      <span className="syncpip-text">{text}</span>
-    </span>
-  )
-}
-
-/* One failing page must not take the whole shell with it: the header, the nav
-   and every other tab keep working while the broken view shows a card. */
-class PageBoundary extends Component<{ children: ReactNode; page: string }, { failed: boolean; why: string }> {
-  state = { failed: false, why: '' }
-  static getDerivedStateFromError(error: unknown) {
-    return { failed: true, why: error instanceof Error ? error.message : String(error) }
-  }
-  /* SAY WHAT BROKE. This card used to swallow the error whole: he hit it
-     repeatedly (2026-09-12) and there was nothing in the console and nothing
-     on screen to say why, so every report was "it keeps happening" and every
-     answer was a guess. The message goes to the console with its component
-     stack, and onto the card, so the next screenshot carries its own cause. */
-  componentDidCatch(error: unknown, info: { componentStack?: string | null }) {
-    console.error('[page crashed]', this.props.page, error, info?.componentStack ?? '')
-  }
-  componentDidUpdate(prev: { page: string }) {
-    if (prev.page !== this.props.page && this.state.failed) this.setState({ failed: false, why: '' })
-  }
-  render() {
-    if (this.state.failed) {
-      return (
-        <div className="page">
-          <div className="panel" style={{ maxWidth: 620 }}>
-            <span className="microcap">This view hit an error</span>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)', marginTop: 8 }}>
-              Nothing was lost. Every other tab still works; open one from the menu above, or reload to try this one again.
-            </p>
-            {this.state.why && (
-              <p className="mono" style={{ fontSize: 'var(--text-xs)', color: 'var(--alert)', marginTop: 10, wordBreak: 'break-word' }}>
-                {this.state.why}
-              </p>
-            )}
-            <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => location.reload()}>Reload</button>
-          </div>
-        </div>
-      )
-    }
-    return this.props.children
-  }
-}
 
 function Logo() {
   return (
@@ -284,108 +185,6 @@ function useNavReveal() {
     show: () => { clear(); setOpen(true) },
     hideSoon: () => { clear(); timer.current = window.setTimeout(() => setOpen(false), NAV_HIDE_MS) },
   }
-}
-
-function PageNav({
-  tabs, page, setPage, onMouseEnter,
-}: {
-  tabs: { id: PageId; label: string }[]
-  page: PageId
-  setPage: (p: PageId) => void
-  onMouseEnter?: () => void
-}) {
-  const { projects, tasks, openProjectId, view, setSpace, enterProject } = useStore()
-  const activeRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
-  }, [page])
-
-  /* A preview, not a menu: hovering Plan jumps straight into a project without
-     a click, and clicking Plan itself still just opens Plan. Projects' own tab
-     left the row on his instruction (2026-09-15), so the one "All projects"
-     row at the end is now the door to the directory where they are made.
-
-     Portalled to the body rather than nested under .nav: .nav clips to its
-     OWN box while revealing (clip-path: inset(0), part of its slide-down
-     animation), so a normal absolutely-positioned child anchored below it
-     was invisible -- present in the DOM, computed as visible, painted
-     nowhere. Fixed position, measured from the trigger's own rect, is the
-     way out of an ancestor that clips by design. */
-  const [hoverOpen, setHoverOpen] = useState(false)
-  const [hoverRect, setHoverRect] = useState<{ top: number; left: number } | null>(null)
-  const hoverTimer = useRef<number | undefined>(undefined)
-  const wrapRef = useRef<HTMLSpanElement>(null)
-  const showHover = () => {
-    window.clearTimeout(hoverTimer.current)
-    const r = wrapRef.current?.getBoundingClientRect()
-    if (r) setHoverRect({ top: r.bottom + 12, left: r.left })
-    setHoverOpen(true)
-  }
-  const hideHoverSoon = () => { hoverTimer.current = window.setTimeout(() => setHoverOpen(false), 350) }
-  const hoverProjects = view === 'all' ? projects : projects.filter((p) => p.space === view)
-  /* Each workspace's default folder: its tasks with no project. */
-  const unsortedSpaces = view === 'all' ? SPACES : [view]
-
-  return (
-    <nav className="nav" aria-label="Pages" onMouseEnter={onMouseEnter}>
-      {tabs.map((t) => {
-        const button = (
-          <button
-            key={t.id}
-            ref={page === t.id ? activeRef : undefined}
-            className="nav-tab"
-            aria-current={page === t.id ? 'page' : undefined}
-            onClick={() => setPage(t.id)}
-          >
-            {t.label}
-          </button>
-        )
-        if (t.id !== 'plan') return button
-        return (
-          <span className="kebab-wrap" key={t.id} ref={wrapRef} onMouseEnter={showHover} onMouseLeave={hideHoverSoon}>
-            {button}
-            {hoverRect && createPortal(
-              /* Same object as .nav itself (same background, radius, padding,
-                 gap, same .nav-tab rows), just turned on its side, and the
-                 SAME drawer reveal .topstick > .nav uses (clip-path closing
-                 over a translate, not a fade) -- copied rather than shared
-                 because this one has to animate on its own class, outside
-                 .topstick's DOM, where that selector can't reach it. Stays
-                 mounted once first opened so closing gets the same
-                 transition as opening, instead of vanishing instantly. */
-              <div
-                className={`nav projnav-menu${hoverOpen ? ' is-open' : ''}`}
-                role="menu"
-                aria-label="Projects"
-                style={{ top: hoverRect.top, left: hoverRect.left }}
-                onMouseEnter={showHover}
-                onMouseLeave={hideHoverSoon}
-              >
-                {unsortedSpaces.map((sp) => (
-                  <button key={`u-${sp}`} className="projrow" data-space="none" role="menuitem" aria-current={openProjectId === UNSORTED && view === sp ? 'true' : undefined} onClick={() => { setSpace(sp); enterProject(UNSORTED); setHoverOpen(false) }}>
-                    <span className="projectmark"><b aria-hidden="true">·</b></span>
-                    <span className="projrow-name">{view === 'all' ? `Unsorted, ${SPACE_LABELS[sp]}` : 'Unsorted'}</span>
-                    <span className="projrow-n mono">{tasks.filter((t) => t.space === sp && !t.projectId && !t.done).length}</span>
-                  </button>
-                ))}
-                {hoverProjects.map((p) => (
-                  <button key={p.id} className="projrow" data-space={p.space} role="menuitem" aria-current={openProjectId === p.id ? 'true' : undefined} onClick={() => { setSpace(p.space); enterProject(p.id); setHoverOpen(false) }}>
-                    <ProjectMark project={p} />
-                    <span className="projrow-name">{p.name}</span>
-                    <span className="projrow-n mono">{tasks.filter((t) => t.projectId === p.id && !t.done).length}</span>
-                  </button>
-                ))}
-                <button className="projrow projnav-all" role="menuitem" onClick={() => { setPage('projects'); setHoverOpen(false) }}>
-                  <span className="projrow-name">All projects</span>
-                </button>
-              </div>,
-              document.body,
-            )}
-          </span>
-        )
-      })}
-    </nav>
-  )
 }
 
 
@@ -564,7 +363,7 @@ const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'reminders', 'revolut', 'sk
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
-  const { space, view, setView, page, setPage, enterProject, tasks, routines, goals, habits, markHabitDaysOn, prompts, storageFull, reminders } = useStore()
+  const { space, view, page, setPage, enterProject, tasks, routines, goals, prompts, storageFull, reminders } = useStore()
   useReminderAlerts(reminders)
   const waitingPrompts = prompts.filter((p) => !p.sentAt).length
   useEffect(() => { try { localStorage.setItem('mc-prompts-waiting', String(waitingPrompts)) } catch { /* private mode */ } }, [waitingPrompts])

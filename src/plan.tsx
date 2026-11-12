@@ -16,25 +16,20 @@ import { usePomodoro } from './pomodoro'
 import { BreakdownSheet, Sheet } from './modals'
 import { WeekGoals, useWeekGoals } from './weekgoals'
 import { Linkify } from './widgets'
-import { PLAN_AHEAD_DAYS, WeekGrid, dayPlus, shortDay, weekRangeLabel } from './weekgrid'
+import { PLAN_AHEAD_DAYS, dayPlus, shortDay } from './weekgrid'
 import { useCoarsePointer, usePhone, Band, WorkspaceTitle, Dropdown, SpaceMark, TagMark } from './ui'
 import { TaskSheet } from './tasksheet'
 import { PlanLine } from './planline'
 import { TagField } from './tagfield'
 import { matchProjects, tagOf, takeTag } from './tags'
 import { HUES, hueOf } from './hues'
-import { SLOTS, SPACES, UNSORTED, habitLocked, routineComplete, routineProgress, slotMinutes, TYPING_TARGET_WPM, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
-import { periodKeyFor, fmtDuration, fmtSigned, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, slotForTime, taskMinutes } from './util'
+import { SLOTS, SPACES, UNSORTED, routineComplete, slotMinutes, type Project, type Routine, type SubTask, type Task, type TimeSlot } from './types'
+import { periodKeyFor, fmtDuration, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, slotForTime, taskMinutes } from './util'
 
 const prevDay = (): string => dayPlus(-1)
 
 /** Tomorrow's date, stepped the same careful way. */
 
-const nextDay = (): string => dayPlus(1)
-
-
-const dateLine = () =>
-  new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
 /** 'Friday, 28 August', for the title of the day panel. He asked (2026-08-28)
  *  for the date OUT of the day switcher's own header and onto the page title
@@ -61,7 +56,6 @@ const offsetDate = (n: number): string => {
   const [, , d] = dayPlus(n).split('-')
   return String(Number(d))
 }
-
 
 
 /* Add a step to a task by hand (his ask, 2026-11-07: every task can have sub tasks). Used under a task's
@@ -281,24 +275,6 @@ function EstimateBtn({ task }: { task: Task }) {
   )
 }
 
-/* Estimating is automatic (store.tsx), so the only action left on a task row is
-   starting a focus block. */
-function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
-  if (!onFocus) return null
-  return (
-    <span className="task-actions">
-      <button
-        className="task-act task-focus"
-        disabled={!isEstimated(task)}
-        aria-label={isEstimated(task) ? `Focus on ${task.title} for ${taskMinutes(task)} minutes` : `Estimating ${task.title}`}
-        title={isEstimated(task) ? `Focus ${taskMinutes(task)}m on this` : 'Estimating...'}
-        onClick={onFocus}
-      >
-        <Icon.Play size={18} />
-      </button>
-    </span>
-  )
-}
 
 /* A routine standing on the day's list. It is DERIVED from the routine, never a
    copy of it: a copied task would drift the moment either side changed, and the
@@ -309,134 +285,11 @@ function TaskActions({ task, onFocus }: { task: Task; onFocus?: () => void }) {
    marks it out is a small "repeats" tag, because a different layout for the same
    kind of thing reads as two different apps on one page. */
 
-/* Each part of the day says WHICH hours it means, in the header, because
-   "Morning" answers nothing about where 12:30 goes. */
-const BUCKET_HINT: Record<string, string> = Object.fromEntries(SLOTS.map((s) => [s.id, s.hint]))
 const BUCKETS: { id: TimeSlot | 'unsorted'; label: string }[] = [
   { id: 'unsorted', label: 'Unsorted' },
   ...SLOTS.map((s) => ({ id: s.id, label: s.label })),
 ]
 
-function RoutineOnDay({ routine, day }: { routine: Routine; day?: string }) {
-  const { toggleRoutineStep, toggleRoutineAlt, setRoutineDone, planRoutine, setPage, inView, habits, stepLog } = useStore()
-  const [open, setOpen] = useState(false)
-  // Counts what the routine needs, so an optional step neither pads the total
-  // nor keeps a finished routine one short of it.
-  const { done, total } = routineProgress(routine)
-  const complete = routineComplete(routine, periodKeyFor(routine.cadence))
-  /* Every step is a habit now, and the gate lives on the habit, not on the
-     routine's own stepData: that field stopped being written the day logging
-     the number moved to the Habits page, so reading it here would have shown
-     the typing step locked forever, passed or not. */
-  const stepGated = (stepId: string): boolean => {
-    const h = habits.find((x) => x.id === (routine.steps.find((s) => s.id === stepId)?.habitId ?? `h-${routine.id}-${stepId}`))
-    return !!h && habitLocked(h, stepLog, localDateKey())
-  }
-  const gated = !complete && routine.steps.some((st) => !routine.doneStepIds.includes(st.id) && stepGated(st.id))
-
-  return (
-    <div className="today-item">
-      <div className={`today-task${complete ? ' done' : ''}`}>
-        {/* A routine is not dragged into a time, but its checkbox still has to
-            line up with the ones under it. */}
-        <span className="drag-grip is-blank" aria-hidden="true"><Icon.Grip /></span>
-        <button
-          className="checkbox"
-          role="checkbox"
-          aria-checked={complete}
-          disabled={total === 0 || gated}
-          aria-label={complete ? `Reopen: ${routine.title}` : `Finish: ${routine.title}`}
-          title={total === 0
-            ? 'Write its steps first'
-            : gated
-              ? `Open it in Habits: one step has to be earned, not ticked (${TYPING_TARGET_WPM} WPM)`
-              : undefined}
-          onClick={() => setRoutineDone(routine.id, !complete)}
-        >
-          <Icon.Check size={12} strokeWidth={4} />
-        </button>
-        <SpaceMark space={routine.space} />
-        <span className="grow wrap2">{routine.title}</span>
-        {/* One tag, saying the one thing it needs to: this is a routine, it put
-            itself here. Cadence words were never asked for. */}
-        <span className="repeat-tag">routine</span>
-        {total > 0 && (
-          <button className="expand-btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}
-            aria-label={open ? 'Collapse steps' : 'Expand steps'}>
-            {open ? '▾' : '▸'} {done}/{total}
-          </button>
-        )}
-        <Dropdown label={`Options for ${routine.title}`}>
-          {/* Moving it is the same menu as putting it here in the first place,
-              so a routine can be planned into the evening and then pulled
-              forward without leaving the day. */}
-          {SLOTS.filter((s) => s.id !== routine.planned?.slot).map((s) => (
-            <button key={s.id} role="menuitem" onClick={() => planRoutine(routine.id, s.id, day)}>Move to {s.label.toLowerCase()}</button>
-          ))}
-          <span className="kebab-sep" />
-          <button role="menuitem" onClick={() => setPage('habits')}>Open in Habits</button>
-          {routine.planned && !routine.startedAt && (
-            <button role="menuitem" onClick={() => planRoutine(routine.id)}>Take it off</button>
-          )}
-        </Dropdown>
-      </div>
-
-      {total === 0 && (
-        <p className="rod-empty">
-          No steps yet.{' '}
-          <button className="rod-link" onClick={() => setPage('habits')}>Write them</button>
-        </p>
-      )}
-
-      {open && total > 0 && (
-        <div className="subtask-list">
-          {routine.steps.map((s) => {
-            const checked = routine.doneStepIds.includes(s.id)
-            const locked = !checked && stepGated(s.id)
-            /* A step with a choice is ticked by picking one of its answers, so
-               here it offers the answers instead of a checkbox that would have
-               to guess which one he meant. */
-            if (s.alts?.length) {
-              return (
-                <div key={s.id} className="subtask-wrap">
-                  {s.alts.map((a) => {
-                    const picked = routine.stepChoice?.[s.id] === a.id
-                    return (
-                      <button
-                        key={a.id}
-                        className={`subtask alt${picked ? ' done' : ''}`}
-                        onClick={() => toggleRoutineAlt(routine.id, s.id, a.id)}
-                      >
-                        <span className="sub-tick" aria-hidden="true" />
-                        <span className="grow">{a.title}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            }
-            return (
-              <div key={s.id} className="subtask-wrap">
-                <button
-                  className={`subtask${checked ? ' done' : ''}`}
-                  disabled={locked}
-                  title={locked ? `Open this in Habits and log ${TYPING_TARGET_WPM} WPM to check it off` : undefined}
-                  onClick={() => (locked ? setPage('habits') : toggleRoutineStep(routine.id, s.id))}
-                >
-                  <span className="sub-tick" aria-hidden="true" />
-                  <span className="grow">{s.title}</span>
-                  {s.optional && <span className="step-optional mono">optional</span>}
-                  {locked && <span className="rod-locked mono">{TYPING_TARGET_WPM} WPM to pass</span>}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-    </div>
-  )
-}
 
 /* The strip itself. Folder glyph, name, open-task count: the same facts a
    project card on the Projects page carries, in one row. Plain click selects
@@ -504,41 +357,6 @@ function FolderGlyph({ cls }: { cls: string }) {
   )
 }
 
-function ProjectStrip({ projects, tasks, sel, showSpaces, touch, inScope, onAll, onPick, onManage }: {
-  projects: Project[]; tasks: Task[]; sel: string[]; showSpaces: boolean; touch: boolean; inScope: (t: Task) => boolean
-  onAll: () => void; onPick: (id: string, add: boolean) => void; onManage: () => void
-}) {
-  const open = (id: string) => tasks.filter((t) => t.projectId === id && !t.done).length
-  const total = projects.reduce((a, p) => a + open(p.id), 0)
-  let lastSpace = ''
-  return (
-    <div className="pstrip" role="group" aria-label="Filter Plan by project">
-      <button className={`pstrip-item${sel.length === 0 ? ' is-on' : ''}`} aria-pressed={sel.length === 0} onClick={onAll}>
-        <Icon.List size={15} /><span>All</span><em className="mono">{total}</em>
-      </button>
-      {projects.map((p) => {
-        const head = showSpaces && p.space !== lastSpace
-        lastSpace = p.space
-        const on = sel.includes(p.id)
-        return (
-          <span className="pstrip-cell" key={p.id}>
-            {head && <SpaceMark space={p.space} always />}
-            <button
-              className={`pstrip-item${on ? ' is-on' : ''}`} aria-pressed={on}
-              onClick={(e) => onPick(p.id, touch || e.shiftKey || e.metaKey || e.ctrlKey)}
-            >
-              <FolderGlyph cls={`s-${p.space}`} /><span>{p.name}</span><em className="mono">{open(p.id)}</em>
-            </button>
-          </span>
-        )
-      })}
-      <button className={`pstrip-item${sel.includes(UNSORTED) ? ' is-on' : ''}`} aria-pressed={sel.includes(UNSORTED)} onClick={(e) => onPick(UNSORTED, touch || e.shiftKey || e.metaKey || e.ctrlKey)}>
-        <FolderGlyph cls="f-unsorted" /><span>Unsorted</span><em className="mono">{tasks.filter((t) => !t.projectId && !t.done && inScope(t)).length}</em>
-      </button>
-      <button className="pstrip-item pstrip-manage" onClick={onManage} aria-label="Manage projects"><Icon.FolderAdd size={15} /></button>
-    </div>
-  )
-}
 
 /* The phone's version of the strip above: one folder icon beside Yesterday that
    opens the same choices as a menu (his ask, 2026-10-16). A dot says a filter is

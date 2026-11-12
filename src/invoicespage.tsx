@@ -19,8 +19,7 @@ import { Dropdown, Segmented, Select } from './ui'
 import * as Icon from './icons'
 import { qrMatrix, qrSvgPath } from './qr'
 import {
-  DEFAULT_PROFILE, STATUS_LABEL, accountsOf, addDays, pickAccount, czIban, daysBetween, ibanSpaced, invoiceTotal, isoDay, money, nextNumber,
-  shownStatus, spayd, totals, vsFromNumber, type ShownStatus,
+  DEFAULT_PROFILE, STATUS_LABEL, accountsOf, addDays, pickAccount, czIban, daysBetween, ibanSpaced, invoiceTotal, isoDay, money, nextNumber, shownStatus, spayd, totals, vsFromNumber,
 } from './invoicecalc'
 import type { BankAccount, Invoice, InvoiceCurrency, InvoiceLang, InvoiceLine, InvoiceParty, InvoiceProfile, PaymentMethod } from './types'
 import type { InvoiceClientDraft, InvoiceDraft } from './store/invoices'

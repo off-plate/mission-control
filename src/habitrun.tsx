@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { FALLBACK_NEWS, PER_LANG, loadMorningNews, twistersForDay, type MorningNews } from './morning-data'
-import { habitGate, habitNumberOn, habitStepKey, type HabitDef, type PageId } from './types'
+import { habitGate, habitNumberOn, habitStepKey, type HabitDef } from './types'
 import { localDateKey } from './util'
 
 /* What a routine STEP could do, on the habit it became.

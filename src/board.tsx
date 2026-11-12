@@ -19,7 +19,6 @@
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useStore } from './store'
-import * as Icon from './icons'
 
 import { wallImage } from './wall-images'
 

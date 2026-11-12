@@ -21,7 +21,7 @@
    site, which is exactly why it read like every other focus timer. */
 
 import { Orb } from './orb'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useClockStamp, useFirstMove, useOpenToday, usePhone } from './ui'
 import { usePomodoro } from './pomodoro'
 import { ZonePlayer, ZoneQueue } from './zoneplayer'

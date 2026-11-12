@@ -20,7 +20,7 @@ import { usePomodoro } from './pomodoro'
 import { Sheet } from './modals'
 import { HabitRun, habitHasRun } from './habitrun'
 import { Band, Dropdown, Segmented, Select, HabitsGoalsSwitch } from './ui'
-import { HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusMinutesOn, focusNeedMin, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineProgress, type PageId, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type TimeSlot } from './types'
+import { HABIT_FREQUENCIES, SLOTS, bestCleanRun, bestStreak, currentStreak, daysClean, keptDaysIn, quitDays, quitKeptDays, slipCount, slipDays, focusNeedMin, habitFrequencyLabel, habitTarget, countIn, countTarget, habitCountOn, habitGate, habitLocked, isCounted, COUNT_PERIODS, requiredSteps, routineProgress, type PageId, type Goal, type HabitDef, type HabitFrequency, type CountPeriod, type HabitKind, type Routine, type TimeSlot } from './types'
 import { goalPeriodRange, habitPeriodRange, shiftPeriodKey, fmtDuration, fmtWhen, dayOfWeekKey, localDateKey, type GoalTf } from './util'
 import { GoalSheet } from './goals'
 
@@ -571,11 +571,6 @@ function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, drivenBy
    row IS, and whether he can touch it, is who keeps it. Three groups, his own
    first, because those are the only ones with a live checkbox in them. */
 type Keeper = 'you' | 'routine' | 'clock'
-const KEEPER_GROUPS: { id: Keeper; label: string }[] = [
-  { id: 'you', label: 'You keep these' },
-  { id: 'routine', label: 'Your routines keep these' },
-  { id: 'clock', label: 'The clock keeps these' },
-]
 /* Inside a group, the day still runs in order. */
 const DAYPART_RANK: Record<string, number> = { morning: 0, noon: 1, afternoon: 2, evening: 3, anytime: 4 }
 

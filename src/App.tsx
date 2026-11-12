@@ -68,7 +68,7 @@ import { CLASSIC_LOOK, SKINS, useSkin } from './skins'
 import { openInShell } from './shells/nav'
 import { ago, describe, useSyncStatus } from './sync'
 import { isReadOnly } from './store'
-import { PROJECT_OFFPLATE, SPACES, UNSORTED, type PageId, type SpaceId, type ViewId } from './types'
+import { PROJECT_OFFPLATE, SPACES, UNSORTED, type PageId, type ViewId } from './types'
 
 /* Is this thing up to date, and where did the last change come from.
 

@@ -36,7 +36,6 @@ import { SPACE_LABELS } from './mock'
 import { MOCK_AGENDA } from './exceptions'
 import { dayIndexOf, fmtDuration, goalPeriodKey, goalPeriodRange, localDateKey, type GoalTf } from './util'
 import { SPACES, currentStreak, daysClean, focusMinutesOn, goalCurrent, isCounted, type AgendaEvent, type Goal, type HabitDef, type Routine, type Task } from './types'
-import * as Icon from './icons'
 
 const yesterdayKey = () => {
   const d = new Date()
@@ -97,12 +96,6 @@ type Stage = 'ask' | 'replay' | 'unmarked' | 'goals' | 'left' | 'today' | 'close
    the day; a routine run or a habit ticked later has no honest time and sits
    under Anytime rather than being given one. */
 type Moment = { key: string; at: number | null; title: string; kind: 'habit' | 'routine' | 'task' | 'focus'; sub?: string }
-const PARTS = ['Morning', 'Midday', 'Afternoon', 'Evening', 'Late', 'Anytime'] as const
-const partOf = (at: number | null): typeof PARTS[number] => {
-  if (at === null) return 'Anytime'
-  const h = new Date(at).getHours()
-  return h < 5 ? 'Late' : h < 12 ? 'Morning' : h < 14 ? 'Midday' : h < 18 ? 'Afternoon' : 'Evening'
-}
 const hm = (at: number) => { const d = new Date(at); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
 const KIND_WORD: Record<Moment['kind'], string> = { habit: 'Habit', routine: 'Routine', task: 'Task', focus: 'Focus' }
 interface Half { r: Routine; done: number; total: number }

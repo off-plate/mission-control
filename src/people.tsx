@@ -19,7 +19,7 @@
    Where he is looking (pan and zoom) is per device and never synced. */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { useStore } from './store'
-import { Segmented, Select } from './ui'
+import { Select } from './ui'
 import { localDateKey } from './util'
 import { ALL_NAMES, daysUntil, nameDayFor } from './namedays'
 import { nextPersonSlot } from './peoplelayout'

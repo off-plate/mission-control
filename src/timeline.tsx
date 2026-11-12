@@ -38,18 +38,13 @@ import { AgeRange, Arcs, Heat, Orbit, Panel, Read, Rows, Slips, Stops, Wheel } f
 import { useCompass, type CompassMoney } from './compass'
 import { reelPool, reelKind, parseReels, dedupe } from './reels'
 import {
-  canPickFolder, forgetFolder, grantFolder, pickFolder, restoreFolder,
-  type FolderState, type LocalReel,
+  forgetFolder, grantFolder, pickFolder, restoreFolder, type FolderState, type LocalReel,
 } from './localreels'
 import { callFunction } from './supabase'
 import { loadYouTubeApi } from './mundiplayer'
 import { getHevyStatsForDay } from './hevy'
-import { localDateKey } from './util'
 import {
-  momentumRun, momentumNow, stateFor, chainOf, rollUp,
-  POINTS, CAPS, HABIT_TARGET, TASK_TARGET, FOCUS_TARGET_MIN, HARD_MIN_DAYS, OUTREACH_TARGET,
-  EMPTY_WIPE, KEPT_AT, GAIN, FRICTION, CEILING, curveFor, project,
-  type DayScore, type Period, type Zoom, type Future,
+  momentumRun, momentumNow, stateFor, chainOf, rollUp, POINTS, CAPS, HABIT_TARGET, TASK_TARGET, FOCUS_TARGET_MIN, HARD_MIN_DAYS, OUTREACH_TARGET, EMPTY_WIPE, KEPT_AT, GAIN, FRICTION, CEILING, curveFor, type DayScore, type Period, type Zoom,
 } from './momentum'
 
 type View = 'ladder' | 'wheel'
@@ -717,29 +712,6 @@ function DayCard({ p, zoom, money }: {
 
 /* -------------------------------------------------------------- two lives */
 
-/* Six tiers, one boundary list -- tierOf (below, next to the domains it
-   gates) reads the same array. A stop's day-value is the boundary minus
-   one, which is what guarantees "+1 month" can never land a day inside
-   tier 3 and show three months of numbers under a one-month header again:
-   there is only one place "30" is written down. */
-const TIER_BOUNDS = [7, 30, 90, 180, 365]
-
-/* THE SLIDER USED TO CARRY A SEPARATE Days/Weeks/Months TOGGLE that only
-   changed the drag increment -- the six futures underneath are the same six
-   tiers regardless (see tierOf), so switching grain at rest, or dragging
-   inside a tier, visibly did nothing. He called that dead. The handle now
-   always drags a full day at a time, and these are the stops that actually
-   change the picture -- tap one to jump straight there, or drag freely
-   between them. */
-const TIER_LABELS = ['This week', '+1 month', '+3 months', '+6 months', '+1 year']
-const TIER_STOPS: { label: string; days: number }[] = [
-  { label: 'Today', days: 0 },
-  ...TIER_LABELS.map((label, i) => ({ label, days: TIER_BOUNDS[i] - 1 })),
-]
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-
 
 /* ---- the reel ---- */
 
@@ -1254,21 +1226,6 @@ function embedSrc(url: string, sound: boolean): string {
 }
 
 /* ---- what it costs, what it pays ---- */
-
-/** 1 = this week, 2 = a few weeks, 3 = a month or two, 4 = a season,
- *  5 = half a year+, 6 = the long haul. Day 0 is handled separately, on
- *  purpose: at nine in the morning nothing has actually happened yet, and
- *  dramatizing that would be the one lie this screen could tell. */
-/* Six tiers, one boundary list. The tap-stops on the footer's scrubber name
-   these same six tiers -- they read this array too (see TIER_STOPS) instead
-   of carrying their own copy of "30", "90", "180"... a second copy is
-   exactly how a stop labelled "+1 month" ended up landing one day inside
-   tier 3 and showing three months of numbers under a one-month header. */
-function tierOf(days: number): 1 | 2 | 3 | 4 | 5 | 6 {
-  for (let i = 0; i < TIER_BOUNDS.length; i++) if (days < TIER_BOUNDS[i]) return (i + 1) as 1 | 2 | 3 | 4 | 5
-  return 6
-}
-
 
 
 /* THE NEGATIVE ROAD, his own document, his own numbers, adjusted to fit the

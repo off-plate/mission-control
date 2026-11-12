@@ -298,22 +298,6 @@ function pickAll<T extends { title: string }>(rows: T[], match: string): { found
    from the real signal, so the blob answers his voice and then its own. */
 export type MarkState = 'idle' | 'thinking' | 'listening' | 'speaking'
 
-/* Base radius, how far the outline strays, and how fast it churns. Idle is
-   almost still on purpose: a mark that writhes while nothing is happening is
-   the same lie as a waveform with no sound behind it. */
-const MOOD: Record<MarkState, { r: number; amp: number; speed: number }> = {
-  idle: { r: 0.56, amp: 0.1, speed: 0.4 },
-  thinking: { r: 0.6, amp: 0.22, speed: 1.8 },
-  listening: { r: 0.58, amp: 0.09, speed: 0.7 },
-  speaking: { r: 0.6, amp: 0.12, speed: 0.9 },
-}
-
-/* Not harmonics of each other, so the lobes never line up into a flower. */
-const RIPPLE = [
-  { lobes: 2, rate: 0.9, phase: 0 },
-  { lobes: 3, rate: -0.61, phase: 2.1 },
-  { lobes: 5, rate: 0.37, phase: 4.3 },
-]
 
 /** A closed outline through points at varying radius, as one smooth path.
 

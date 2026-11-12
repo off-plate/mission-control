@@ -4,7 +4,7 @@
    across two workspaces (2026-09-09) -- too many to browse without a filter,
    so this is the one dock panel that leads with a search input rather than
    a glanceable headline. */
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useStore } from './store'
 import { useSkills, type Skill } from './skills'
 import * as Icon from './icons'

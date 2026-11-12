@@ -33,9 +33,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from './store'
 import { SPACE_LABELS } from './mock'
-import { MOCK_AGENDA } from './exceptions'
 import { dayIndexOf, fmtDuration, goalPeriodKey, goalPeriodRange, localDateKey, type GoalTf } from './util'
-import { SPACES, currentStreak, daysClean, focusMinutesOn, goalCurrent, isCounted, type AgendaEvent, type Goal, type HabitDef, type Routine, type Task } from './types'
+import { SPACES, currentStreak, daysClean, focusMinutesOn, goalCurrent, isCounted, type Goal, type HabitDef, type Routine, type Task } from './types'
 
 const yesterdayKey = () => {
   const d = new Date()
@@ -100,13 +99,12 @@ const hm = (at: number) => { const d = new Date(at); return `${String(d.getHours
 const KIND_WORD: Record<Moment['kind'], string> = { habit: 'Habit', routine: 'Routine', task: 'Task', focus: 'Focus' }
 interface Half { r: Routine; done: number; total: number }
 
-const SHOW_AT_ONCE = 8
 
 export function DailyReview() {
   const {
-    tasks, projects, habits, habitLog, routines, routineLog, stepTicks, slips, focusSessions,
+    tasks, projects, habits, habitLog, routines, routineLog, slips, focusSessions,
     goals, plan, dailyDone, dailySkipped, dailyOpen, openDaily, closeDaily, markHabitOn, assertRoutineOn, logSlipOn,
-    moveTasksToToday, deleteTask, setPage, bumpGoal,
+    moveTasksToToday, deleteTask, bumpGoal,
   } = useStore()
   /* Where a task came from: its project when it has one (Off-Plate and Michael's
      Corner are projects), otherwise its workspace when that is not Personal. */
@@ -261,19 +259,6 @@ export function DailyReview() {
     return tasks.filter((t) => ids.has(t.id) && !t.done && t.list !== 'today')
   }, [tasks, plan, today])
 
-  /* ---- what today looks like ---- */
-  const todayTasks = useMemo(
-    () => tasks.filter((t) => !t.done && t.list === 'today' && (t.plannedOn ?? today) === today),
-    [tasks, today],
-  )
-  const events = useMemo(
-    () => SPACES.flatMap((sp) => (MOCK_AGENDA[sp] ?? []) as AgendaEvent[]).sort((a, b) => a.start.localeCompare(b.start)),
-    [],
-  )
-  const goalsDue = useMemo(
-    () => goals.filter((g) => g.deadline && g.deadline >= today && g.deadline <= localDateKey(new Date(Date.now() + 7 * 864e5))),
-    [goals, today],
-  )
 
   /* A reopen is a NEW walk. This never unmounts on close, so everything frozen
      for the last one survived into the next: the leftover headline said two
@@ -316,7 +301,6 @@ export function DailyReview() {
      index went to -1 and Next handed him back the opening screen. Doing the
      honest thing and clearing the whole list was the one path that looped. */
   const [walk, setWalk] = useState<Stage[] | null>(null)
-  const stages = walk ?? live
 
   const everLogged = habitLog.length + routineLog.length + focusSessions.length > 0
   const owed = everLogged && dailyDone !== today && dailySkipped !== today
@@ -355,14 +339,6 @@ export function DailyReview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const at = stages.indexOf(stage)
-  const next = () => {
-    const n = stages[at + 1]
-    if (!n) return leave(true)
-    setStage(n)
-    setShowAll(false)
-  }
-  const back = () => { const p = stages[at - 1]; if (p) setStage(p) }
 
   if (!open) return null
 
@@ -373,10 +349,7 @@ export function DailyReview() {
 
   const un = rows?.un ?? []
   const half = rows?.half ?? []
-  const quit = rows?.quit ?? []
   const order = [...half.map((x) => `r:${x.r.id}`), ...un.map((h) => `h:${h.id}`)]
-  const hidden = !showAll && order.length > SHOW_AT_ONCE
-  const shows = (k: string) => !hidden || order.indexOf(k) < SHOW_AT_ONCE
 
   /* What is still open, counted across EVERYTHING he was shown, not only the
      tasks. Counting tasks alone meant a morning with eight unticked habits and
@@ -398,25 +371,7 @@ export function DailyReview() {
     : [...halfDone.map((x) => `r:${x.r.id}`), ...unmarked.map((h) => `h:${h.id}`)])
     .filter((k) => !fixed.has(k)).length
     + (left ?? leftOver).filter((t) => taskState(t.id) === null).length
-  /* Admitting a relapse is not putting the record right. Telling him it is
-     misreads what he just did. */
-  const putRight = [...fixed.keys()].filter((k) => !k.startsWith('s:') && !k.startsWith('t:')).length
-    + (left ?? leftOver).filter((t) => taskState(t.id) !== null).length
-  const owned = [...fixed.keys()].filter((k) => k.startsWith('s:')).length
 
-  /* The headline counts what is STILL undone, so it cannot sit above a row that
-     says "on today" claiming two when one is left. */
-  const leftCount = (left ?? leftOver).filter((t) => taskState(t.id) === null).length
-  /* What is actually waiting, by name. */
-  const froze = rows ?? { un: unmarked, half: halfDone }
-  const waiting: { id: string; name: string; where?: string }[] = [
-    ...froze.half.filter((x) => !fixed.has(`r:${x.r.id}`))
-      .map((x) => ({ id: x.r.id, name: x.r.title, where: x.r.space !== 'personal' ? SPACE_LABELS[x.r.space] : undefined })),
-    ...froze.un.filter((h) => !fixed.has(`h:${h.id}`))
-      .map((h) => ({ id: h.id, name: h.name, where: h.space !== 'personal' ? SPACE_LABELS[h.space] : undefined })),
-    ...(left ?? leftOver).filter((t) => taskState(t.id) === null)
-      .map((t) => ({ id: t.id, name: t.title, where: whereOf(t) })),
-  ]
   /* ---- one page (rebuilt 2026-10-04) -------------------------------------
      No steps: everything yesterday asks of him is on one screen, built from the
      Today room's own cards, so it looks like Mission Control and Jarvis

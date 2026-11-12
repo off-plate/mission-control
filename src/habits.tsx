@@ -87,17 +87,11 @@ function routineRecord(kept: Set<string>, freq: HabitFrequency | undefined, win:
   return { hit, due, unit }
 }
 
-/* Habits used to be grouped by the part of the day they belong to. That axis
-   described nothing: ten of sixteen landed in "Anytime", which is the group
-   that means no group, and it was printed first. The axis that decides what a
-   row IS, and whether he can touch it, is who keeps it. Three groups, his own
-   first, because those are the only ones with a live checkbox in them. */
-type Keeper = 'you' | 'routine' | 'clock'
 /* Inside a group, the day still runs in order. */
 const DAYPART_RANK: Record<string, number> = { morning: 0, noon: 1, afternoon: 2, evening: 3, anytime: 4 }
 
 export function HabitsPage() {
-  const { habits, goals, space, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, markHabitDaysOn, todayIndex, inView, focusRoutineId, setFocusRoutineId, toggleHabitDay, slips, logSlip, focusSessions } = useStore()
+  const { habits, goals, deleteHabit, togglePauseHabit, routines, stepTicks, habitLog, markHabitDaysOn, todayIndex, focusRoutineId, setFocusRoutineId, toggleHabitDay, slips, focusSessions } = useStore()
   const days = 7
   const [adding, setAdding] = useState(false)
   // Opening the goal sheet from a habit is the "set a goal on this" path.
@@ -154,11 +148,6 @@ export function HabitsPage() {
      anything on screen. What he wants on a Sunday morning is what is still
      open TODAY. */
 
-  /* Grouped by who keeps it, and inside a group what is still open comes
-     first, because a habit already ticked is a record and not a thing
-     still to do. */
-  const keeperOf = (h: HabitDef): Keeper =>
-    (h.auto?.from === 'focus' || h.kind === 'measured') ? 'clock' : drivenBy.has(h.id) ? 'routine' : 'you'
   const rank = (h: HabitDef) =>
     (h.paused ? 2 : h.days[todayIndex] ? 1 : 0) * 10 + (DAYPART_RANK[h.daypart ?? 'anytime'] ?? 4)
   /* Folders first, then whatever is loose. His model: a routine IS a folder of

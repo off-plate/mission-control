@@ -8,7 +8,7 @@ import { localDateKey } from '../util'
 /* One sheet for adding and editing. A habit a routine drives keeps its name and
    frequency in step with that routine, so those fields are read-only here. */
 export function HabitSheet({ onClose, habit, drivenBy }: { onClose: () => void; habit?: HabitDef; drivenBy?: string }) {
-  const { addHabit, updateHabit, inView } = useStore()
+  const { addHabit, updateHabit } = useStore()
   const [name, setName] = useState(habit?.name ?? '')
   // Editing keeps whatever it had, including none. Only a new habit defaults.
   const [daypart, setDaypart] = useState<TimeSlot | ''>(habit ? (habit.daypart ?? '') : 'morning')

@@ -363,7 +363,7 @@ const NOTHING_OPENED: PageId[] = ['bills', 'mymind', 'reminders', 'revolut', 'sk
 const DARK_CHROME_PAGES: PageId[] = ['timeline', 'board', 'health', 'gym', 'longevity']
 
 export default function App() {
-  const { space, view, setView, page, setPage, enterProject, tasks, routines, goals, habits, markHabitDaysOn, prompts, storageFull, reminders } = useStore()
+  const { space, view, page, setPage, enterProject, tasks, routines, goals, prompts, storageFull, reminders } = useStore()
   useReminderAlerts(reminders)
   const waitingPrompts = prompts.filter((p) => !p.sentAt).length
   useEffect(() => { try { localStorage.setItem('mc-prompts-waiting', String(waitingPrompts)) } catch { /* private mode */ } }, [waitingPrompts])

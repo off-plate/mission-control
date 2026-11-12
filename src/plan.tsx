@@ -8,7 +8,6 @@ import * as Icon from './icons'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SPACE_LABELS } from './exceptions'
-import { fakeDecompose } from './mock'
 import { useStore } from './store'
 import { usePomodoro } from './pomodoro'
 import { BreakdownSheet } from './modals'
@@ -21,8 +20,8 @@ import { PlanLine } from './planline'
 import { TagField } from './tagfield'
 import { matchProjects, tagOf, takeTag } from './tags'
 import { hueOf } from './hues'
-import { SLOTS, SPACES, UNSORTED, routineComplete, slotMinutes, type Project, type Routine, type Task, type TimeSlot } from './types'
-import { periodKeyFor, fmtDuration, dayOfWeekKey, isEstimated, localDateKey, slotForMoment, slotForTime, taskMinutes } from './util'
+import { SLOTS, SPACES, UNSORTED, slotMinutes, type Project, type Task, type TimeSlot } from './types'
+import { fmtDuration, isEstimated, localDateKey, slotForTime, taskMinutes } from './util'
 import { longDay, offsetDate, offsetWord, prevDay } from './plan/days'
 import { ActualLog, EditTaskSheet, EstimateBtn, EstimateChip, StepAdd, SubEdit, SubtaskRow } from './plan/taskrow'
 import { Spotlight } from './plan/spotlight'
@@ -46,8 +45,8 @@ export function PlanPage() {
   const todayIdx = (new Date().getDay() + 6) % 7
   const pomo = usePomodoro()
   const { startFocus } = pomo
-  const { routines, habits, openDaily } = useStore()
-  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, addTaskWithSubtasks, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions, dayLog } = useStore()
+  const { openDaily } = useStore()
+  const { space, tasks, toggleTask, logActual, assignSlot, toggleSubtask, logSubtaskActual, moveTasksToToday, moveTaskList, deleteTask, addTask, focusTaskId, setFocusTaskId, setTaskAt, plan, setPage, openDay, view, inView, focusSessions } = useStore()
   const { projects, openProjectId, setTaskProject, setTaskSpace, setSpace, setView, enterProject } = useStore()
   /* A project is a room inside a Space, not a second store: this is the one
      line that scopes Plan to it. Everything below (backlog, the day, the
@@ -107,16 +106,6 @@ export function PlanPage() {
   /* Offered in the add box: this workspace's projects first, then the rest,
      because a hashtag can file a task anywhere. */
   const tagChoices = view === 'all' ? stripProjects : [...stripProjects, ...projects.filter((p) => p.space !== view)]
-  const submitQuick = () => {
-    const got = takeTag(quick, projects)
-    if (!got.title) return
-    const proj = got.project ?? (newProjectId ? projects.find((p) => p.id === newProjectId) : undefined)
-    addTask({ title: got.title, source: 'mc', estimateMin: 0, space: proj?.space ?? addSpace, list: 'backlog', category: 'quick', projectId: proj?.id })
-    /* Filed somewhere the list is not showing: widen the filter to it, so the
-       task he just wrote does not vanish the moment he presses Enter. */
-    if (got.project && sel.length && !sel.includes(got.project.id)) setPicked((prev) => [...prev, got.project!.id])
-    setQuick('')
-  }
 
   /* Moving a task between a project and the Space's own Plan is the same
      move either direction: set or clear projectId. A task's own space never
@@ -201,7 +190,6 @@ export function PlanPage() {
     : sortBy === 'shortest' ? (a, b) => taskMinutes(a) - taskMinutes(b) || byNewest(a, b)
     : byNewest,
   )
-  const backlogMins = backlogOpen.reduce((a, t) => a + taskMinutes(t), 0)
   /* Which day the right hand column is laying out. This used to be a single
      step, today or tomorrow, on the argument that Sunday evening is exactly
      when a week gets planned and Monday could not be touched until Monday. He
@@ -225,55 +213,9 @@ export function PlanPage() {
   const planDay = dayPlus(dayOffset)
   const onDay = (t: Task) => t.list === 'today' && (t.plannedOn ?? localDateKey()) === planDay
   const todayAll = spaceTasks.filter(onDay)                      // the day incl. finished (they stay, struck)
-  const todayTasks = todayAll.filter((t) => !t.done)             // still to do
-  const doneUnsorted = todayAll.filter((t) => t.done && !t.slot) // finished, never scheduled
+// still to do
+// finished, never scheduled
 
-  /* A routine reaches the day by being started, not by existing. Until he ticks
-     his first step it lives on the Routines page only, so Today opens as the
-     work he chose rather than a wall of things the app put there. The moment it
-     starts it files itself under the time he started it: this list is a record
-     of the day, not a plan for it. */
-  /* A day ahead's weekend is not today's: planning a Friday from a Tuesday must
-     not hide the work routines it is planning. */
-  const dayIdx = (todayIdx + dayOffset) % 7
-  const isWeekend = dayIdx >= 5
-  const today = localDateKey()
-  const ahead = dayOffset > 0
-  /* Started counts as on today only. A routine cannot have been started on a day
-     that has not happened, so a day ahead shows exactly what he has planned
-     onto it.
-
-     "Started" has to mean started TODAY, not merely started at some point in
-     the period still running. This read `!!r.startedAt`, and startedAt is only
-     cleared when the PERIOD rolls over, which for a monthly routine is the
-     turn of the month. So the Monthly review, begun once on an afternoon, sat
-     on every single day for the rest of that month, in the slot matching the
-     hour it was first opened, already finished, and "Take it off" could not
-     shift it because that only clears `planned`. His report, exactly. */
-  const startedOn = (r: Routine) => (r.startedAt ? localDateKey(new Date(r.startedAt)) : null)
-  const onToday = (r: Routine) => (ahead
-    ? r.planned?.day === planDay
-    : (startedOn(r) === planDay || r.planned?.day === planDay))
-  const dueRoutines = routines.filter((r) => inView(r.space) && !r.archivedAt && onToday(r) && !(r.cadence === 'prework' && isWeekend))
-  /* A slot he chose wins over the clock: planning it for the evening and
-     starting it early should not throw it back to the morning while he is
-     looking at it. */
-  const routineSlot = (r: Routine): TimeSlot | 'unsorted' =>
-    r.planned?.day === planDay && r.planned.slot ? r.planned.slot
-      : (!ahead && r.startedAt) ? slotForMoment(r.startedAt) : 'unsorted'
-  const plannedMin = todayTasks.reduce((a, t) => a + taskMinutes(t), 0)
-
-  /* Progress counts everything in the space, today included, and counts finished
-     SUBTASK minutes too, so a task that is two thirds done moves the bar instead
-     of reading as zero until the last step lands. */
-  const pool = spaceTasks
-  const totalMin = pool.reduce((a, t) => a + taskMinutes(t), 0)
-  const doneMin = pool.reduce((a, t) => {
-    if (t.done) return a + taskMinutes(t)
-    return a + (t.subtasks?.filter((s) => s.done).reduce((x, s) => x + s.estimateMin, 0) ?? 0)
-  }, 0)
-  const doneCount = pool.filter((t) => t.done).length
-  const donePct = totalMin ? Math.round((doneMin / totalMin) * 100) : 0
 
   /* Time saved today: estimate minus what it actually took. A task finished
      through the focus timer never had its minutes typed in, so its focus blocks
@@ -303,8 +245,6 @@ export function PlanPage() {
   }, 0)
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [goal, setGoal] = useState('')
-  const [busy, setBusy] = useState(false)
   const [dropKey, setDropKey] = useState<string | null>(null)
   /* DRAG A TASK, HOVER A DAY, IT OPENS ITSELF. His ask, 2026-08-29: sorting a
      few tasks across a few days meant a full click-drag-click-drag lap per
@@ -386,7 +326,6 @@ export function PlanPage() {
     setHandoffDismissed(true)
   }
   const [listDropOver, setListDropOver] = useState(false)
-  const [quick, setQuick] = useState('')
   const [breakdownFor, setBreakdownFor] = useState<Task | null>(null)
   const sheetTask = sheetId ? tasks.find((x) => x.id === sheetId) ?? null : null
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -477,18 +416,6 @@ export function PlanPage() {
   const toggleExp = (id: string) =>
     setExpanded((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  const generate = () => {
-    if (!goal.trim() || busy) return
-    setBusy(true)
-    window.setTimeout(() => {
-      const steps = fakeDecompose(goal)
-      addTaskWithSubtasks(
-        { title: goal.trim(), source: 'mc', estimateMin: 0, space, list: 'backlog', category: 'deep' },
-        steps.map((s) => ({ title: s.title, estimateMin: s.estimateMin })),
-      )
-      setGoal(''); setBusy(false)
-    }, 750)
-  }
 
   /* One drop handler for both directions: into a time bucket moves the task to
      today and slots it; onto the list sends it back to the backlog. */
@@ -505,45 +432,6 @@ export function PlanPage() {
     assignSlot(id, undefined)
   }
 
-  /* THE WEEK, on his instruction (2026-08-28): not the seven days ahead of the
-     switcher above, which follows him and always starts on whichever day he
-     opens the app, but the calendar week he is actually standing in, Monday to
-     Sunday, so a Wednesday still shows what Monday looked like. Its own state:
-     it does not track dayOffset, and stepping it does not move the day panel.
-
-     READ ONLY BY DESIGN. The day panel above is already the tool for placing a
-     task into a time of day; asking this grid to be forty nine more drop zones
-     would make one job two half-built tools instead of one whole one. A day's
-     header is the one thing here that does anything: click it and the day
-     panel steps onto that day if it can, or opens that day's record if it
-     already happened. */
-  const [weekShift, setWeekShift] = useState(0)
-  /* Folded shut on load, every time: the week is context for the day he's
-     planning, not the first thing the page shows. His own mockup put it
-     right under the header, above the to-do list and day panel, collapsed
-     to one bar until he opens it. */
-  const [weekOpen, setWeekOpen] = useState(false)
-  /* THE ALMANAC. He picked this shape from three variants shown as artifacts,
-     2026-08-30: a card per day with a ring for how full it is and its tasks
-     grouped into slot chips, over the flat hairline table it replaces. A
-     density cap with a "show every task" switch shipped first, then came
-     out again on his word: he always wants every task visible, so there is
-     no toggle left to default shut. */
-  const weekAnchor = dayPlus(weekShift * 7)
-  const weekDays = Array.from({ length: 7 }, (_, i) => dayOfWeekKey(i, new Date(`${weekAnchor}T12:00:00`)))
-  const weekTasks = spaceTasks.filter((t) => t.list === 'today')
-  /* How far a date sits from today, so a click knows whether to step the day
-     panel (it can reach today plus PLAN_AHEAD_DAYS) or open the record of a
-     day already gone. */
-  const daysOut = (iso: string) => Math.round(
-    (new Date(`${iso}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000,
-  )
-  const jumpToDay = (iso: string) => {
-    const out = daysOut(iso)
-    if (out < 0) { openDay(iso); return }
-    setDayOffset(Math.min(out, PLAN_AHEAD_DAYS))
-    document.querySelector('.day-switch')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }
 
   /* ---------------- TODAY FOCUS (2026-11-02) ----------------
      He picked this shape from three working versions: one task in front of
@@ -586,9 +474,6 @@ export function PlanPage() {
     try { localStorage.setItem('mc:next-up', JSON.stringify(next)) } catch { /* private mode */ }
   }
   const nextUp = dayOpen.find((t) => t.id === nextPick[planDay]) ?? dayOpen[0]
-  const dayRest = dayOpen.filter((t) => t !== nextUp)
-  const dayDone = todayAll.filter((t) => t.done)
-  const rDone = (r: Routine) => routineComplete(r, periodKeyFor(r.cadence))
 
   /* THE DAY IN THREE NUMBERS, back from the old header on his word
      (2026-11-02): what is planned, how long it takes, what is left. They read

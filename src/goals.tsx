@@ -344,7 +344,7 @@ function PeriodTasks({ tf, periodKey }: { tf: GoalTimeframe; periodKey: string }
 /** The last `n` days, each one before the quit began, slipped, or clean. */
 
 export function GoalsPage() {
-  const { space, goals, habits, habitLog, focusSessions, slips, bumpGoal, toggleGoalMilestone, deleteGoal, repeatGoal, inView } = useStore()
+  const { goals, habits, habitLog, focusSessions, slips, bumpGoal, toggleGoalMilestone, deleteGoal, repeatGoal } = useStore()
   const all = goals
   /* A goal belongs to a period. The ones whose period has ended are not deleted
      and do not keep counting: they sit below with the number they finished on. */

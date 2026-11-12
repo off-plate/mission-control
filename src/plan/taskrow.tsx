@@ -173,7 +173,7 @@ export function ActualLog({ est, tracked, onLog, onSkip }: { est: number; tracke
 /* The estimate is a number you can argue with. Click it and type your own; the
    generated one is a starting point, not a verdict. */
 export function EstimateChip({ task }: { task: Task }) {
-  const { setEstimate, inView } = useStore()
+  const { setEstimate } = useStore()
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState('')
   const fromSteps = !!task.subtasks?.length

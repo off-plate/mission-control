@@ -105,7 +105,7 @@ const shortDate = (key: string): string => {
 }
 
 export function QuittingPage() {
-  const { habits, inView, slips, logSlip, deleteHabit, togglePauseHabit } = useStore()
+  const { habits, slips, logSlip, deleteHabit, togglePauseHabit } = useStore()
   const [adding, setAdding] = useState(false)
   useEffect(() => {
     const on = (e: Event) => { if ((e as CustomEvent).detail === 'quitting') setAdding(true) }

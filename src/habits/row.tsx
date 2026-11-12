@@ -91,7 +91,7 @@ export function HabitRow({ h, todayIndex, days: window = 7, actions, stateTag, d
   /** A goal counting itself off this habit, if one exists. */
   goal?: Goal
 }) {
-  const { toggleHabitDay, assertRoutineDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, stepLog, inView } = useStore()
+  const { toggleHabitDay, assertRoutineDay, logSlip, logCount, setPage, focusSessions, habitLog, slips, stepLog } = useStore()
   const [open, setOpen] = useState(false)
   const [giveUp, setGiveUp] = useState(false)
   /* The block on the clock counts toward today, so an hour reached while the

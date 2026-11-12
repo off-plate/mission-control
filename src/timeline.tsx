@@ -58,7 +58,7 @@ const ROWS: Record<Zoom, number> = { d: 21, w: 12, m: 6 }
 export const inAllSpaces = () => true
 
 export function TimelinePage() {
-  const { habits, habitLog, tasks, focusSessions, prospects, setPage } = useStore()
+  const { habits, habitLog, tasks, focusSessions, prospects } = useStore()
   /* Remembered, so the nav on Health and Why can bring him back to the view
      he left rather than always to the ladder. */
   const { view: jarView, lives } = useJarState()

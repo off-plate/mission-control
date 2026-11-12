@@ -1,10 +1,48 @@
 import { haptic } from './haptic'
 import { flushSync } from 'react-dom'
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
 import { estimateTask } from './ai'
 import { estimateFor } from './estimate'
+import { deviceId, deviceName, mergeStates } from './sync-merge'
+import { todayKey } from './store/shared'
+import { type Undoable, useUndo } from './store/undo'
+import { useGraveyard } from './store/graveyard'
+import { useNotesSlice } from './store/notes'
+import { useTwoLivesSlice } from './store/twolives'
+import { useIdeaBoardSlice } from './store/ideaboard'
+import { useRemindersSlice } from './store/reminders'
+import { usePromptsSlice } from './store/prompts'
+import { usePeopleSlice } from './store/people'
+import { useProspectsSlice } from './store/prospects'
+import { useInvoicesSlice } from './store/invoices'
+import { useInvoiceCloud } from './invoicecloud'
+import type { OutreachEvent, SheetRow } from './prospectcalc'
+import { useGymSlice } from './store/gym'
+import { useConnectionsSlice } from './store/connections'
+import { useCoachSlice } from './store/coach'
+import { useAssistantSlice } from './store/assistant'
+import { useGrowthSlice } from './store/growth'
+import { usePlannerSlice } from './store/planner'
+import { useLedgerSlice } from './store/ledger'
+import { isoWeekKey, localDateKey } from './util'
+import { isSpace } from './types'
+import { foldSpaces } from './foldspaces'
+import type { Invoice, InvoiceClient, InvoiceProfile, PageId, SpaceId, Task, ViewId } from './types'
+import { BACKUP_KEY, STORAGE_KEY, type ActiveFocus, type PersistedState, type Store } from './store/state'
+import { isReadOnly, loadPersisted } from './store/load'
+import { routeFromHash } from './store/route'
+import { Ctx, useStore } from './store/context'
+import { UndoToast } from './store/undotoast'
+
+/* store.tsx is the provider: it composes one hook per domain (src/store/),
+   saves the result, and merges in whatever arrives from another tab or
+   device. The shape of the store is in store/state.ts, the loader and its
+   migrations in store/load.ts. These re-exports keep every existing
+   `from './store'` import working. */
+export { STORAGE_KEY, BACKUP_KEY, isReadOnly, useStore }
+export type { ActiveFocus, Undoable }
 
 /* Two blobs are the same work if they differ only in when they were saved.
    Used both to stop two tabs answering each other's saves forever, and to decide
@@ -21,970 +59,14 @@ function stripDates(j: string): string {
     return JSON.stringify(o)
   } catch { return j }
 }
-import { roll } from './roll'
-import { deviceId, deviceName, mergeStates, rowKey, type LastWrite, type Tomb } from './sync-merge'
-import { newId, todayKey } from './store/shared'
-import { type Undoable, useUndo } from './store/undo'
-import { useGraveyard } from './store/graveyard'
-import { noteTitle, useNotesSlice } from './store/notes'
-import { useTwoLivesSlice } from './store/twolives'
-import { useIdeaBoardSlice, type IdeaBoardSlice } from './store/ideaboard'
-import { useRemindersSlice, type RemindersSlice } from './store/reminders'
-import { usePromptsSlice, type PromptsSlice } from './store/prompts'
-import { usePeopleSlice, type PeopleSlice } from './store/people'
-import { useProspectsSlice, type ProspectsSlice } from './store/prospects'
-import { useInvoicesSlice, type InvoicesSlice } from './store/invoices'
-import { useInvoiceCloud } from './invoicecloud'
-import type { OutreachEvent, SheetRow } from './prospectcalc'
-import { useGymSlice, type GymSlice } from './store/gym'
-import { useConnectionsSlice } from './store/connections'
-import { useCoachSlice } from './store/coach'
-import { useAssistantSlice } from './store/assistant'
-import { foldersFromRoutines, useGrowthSlice } from './store/growth'
-import { usePlannerSlice } from './store/planner'
-import { dayIndexOf, dayOfWeekKey, goalPeriodKey, goalPeriodRange, isoWeekKey, localDateKey, periodIsPast, periodKeyFor, type GoalTf } from './util'
-import {
-  MOCK_GOALS,
-  MOCK_HABITS,
-  MOCK_LEDGER,
-  LATE_STEPS,
-  MOCK_ROUTINES,
-} from './mock'
-import { focusNeedMin, goalCurrent, isTimeFed, routineComplete } from './types'
-import { isSpace, SPACES, spaceFolderId } from './types'
-import { foldSpaces } from './foldspaces'
-import type { HabitFrequency } from './types'
-import type {
-  ViewId,
-  FocusSession,
-  HabitSlip,
-  HabitTick,
-  RoutineDone,
-  StepEntry,
-  StepTick,
-  RoutineCadence,
-  AssistantEntry,
-  CoachFacts,
-  CoachSession,
-  DayTaskLog,
-  Goal,
-  Idea,
-  IdeaCard,
-  Reminder,
-  ReminderList,
-  PromptItem,
-  Person,
-  PersonBond,
-  PersonContact, Prospect,
-  GymGoal,
-  Invoice, InvoiceClient, InvoiceProfile,
-  Note,
-  NoteFolder,
-  Routine,
-  HabitDef,
-  LedgerEntry,
-  PageId,
-  PlanState,
-  Project,
-  ReviewState,
-  SpaceId,
-  Task,
-  TaskCategory,
-} from './types'
-
-export const STORAGE_KEY = 'mission-control-demo-v12'
-/** The untouched copy of whatever was saved before this build migrated it. */
-export const BACKUP_KEY = 'mission-control-backup-v3'
-
-/* Saved state written by a NEWER build than this one. This build cannot read it,
-   so it must not write either: seeding fresh and saving would replace whatever
-   the newer device wrote with an empty start. The app runs, and says so. */
-let futureBlob = false
-export function isReadOnly(): boolean { return futureBlob }
-
-interface PersistedState {
-  version: 3
-  tasks: Task[]
-  habits: HabitDef[]
-  goals: Goal[]
-  /** Rooms inside a Space. Optional so an old saved blob without any still
-   *  reads as an empty list rather than failing to parse. */
-  projects?: Project[]
-  /** People. Optional for the same reason projects is. */
-  ledger: LedgerEntry[]
-  plan: PlanState
-  review: ReviewState
-  assistantLog: AssistantEntry[]
-  coachSessions: CoachSession[]
-  routines: Routine[]
-  ideas: Idea[]
-  /** Notes, and the folders he made for them. Workspace folders are derived,
-   *  not stored, so `noteFolders` only ever holds his own. */
-  notes?: Note[]
-  noteFolders?: NoteFolder[]
-  /** ISO week the habit checkmarks belong to; a new week archives and clears them. */
-  weekKey?: string
-  /** One-time data repairs already applied to this saved state. */
-  fixes?: number
-  /** Personal bests, keyed by `routineId:stepId`. Survives every rollover. */
-  records?: Record<string, number>
-  savedAt?: number
-  /** Which device saved this copy. Read by the OTHER devices. */
-  lastWrite?: LastWrite
-  /** Which storage schema wrote this. A row from an older one is not reused. */
-  schema?: string
-  /** Seeded habits and routines he deleted on purpose; never re-seeded. */
-  removedSeeds?: string[]
-  /** Every finished focus block, so a measured habit has something to count. */
-  focusSessions?: FocusSession[]
-  /** Every day a habit was kept, dated. The durable record behind days[]. */
-  habitLog?: HabitTick[]
-  /** Every day a routine was finished, dated. */
-  routineLog?: RoutineDone[]
-  /** Every day he slipped on a habit he is quitting, dated. */
-  slips?: HabitSlip[]
-  /** Every number a routine step recorded, dated. `records` keeps only the best. */
-  stepLog?: StepEntry[]
-  /** How each day's plan actually went: planned vs. done, stamped at
-   *  rollover before the leftovers lose their day. Written going forward
-   *  only; nothing before this existed can be backfilled. */
-  dayLog?: DayTaskLog[]
-  /** Every step ticked, dated. The routine's own doneStepIds is wiped at
-   *  rollover, so this is the only thing that can say a routine was HALF done
-   *  on a day that is no longer today. */
-  stepTicks?: StepTick[]
-  /** The last day the rollover ran. Everything after it is unsealed. */
-  lastRollDay?: string
-  /** The last day the daily review was walked, and the last day it was waved
-   *  off. Two fields rather than one, so "not today" is remembered as a choice
-   *  and does not read on the next open as though he had done it. */
-  dailyDone?: string
-  dailySkipped?: string
-  /** How many rows had no space and were filed as Personal on migration. */
-  spaceGuessed?: number
-  /** Keys of rows deliberately deleted, so a merge cannot resurrect them. */
-  graveyard?: Tomb[]
-  /** THE TWO LIVES FOOTAGE. One link per pane per stop, keyed `<stop>-drift`
-   *  or `<stop>-push`. It lives in the synced blob rather than on the device
-   *  because the screen he opens when he wants to quit has to be the same
-   *  screen on the phone at midnight as on the laptop at noon. */
-  twoLives?: Record<string, string>
-  /** THE REEL LIBRARY he pasted in. Hundreds of links, merged with the curated
-   *  list in `reels.ts` at read time. In the synced blob because a library he
-   *  built on the laptop has to be there on the phone at midnight. */
-  reels?: string[]
-  /** His own focus-music links for the Zone's player. */
-  tunes?: string[]
-  /** Instagram link -> the file reel-fetch downloaded for it, once. Synced so
-   *  the download that already happened on one device is a lookup on every
-   *  other, not a second fetch. */
-  reelFiles?: Record<string, string>
-  /** The Ideas board: every sticky and where he left it. */
-  ideaBoard?: IdeaCard[]
-  reminders?: Reminder[]
-  reminderLists?: ReminderList[]
-  /** Prompts waiting for the Claude usage window. */
-  prompts?: PromptItem[]
-  /** The People page: who, who knows whom, and every logged contact. */
-  people?: Person[]
-  personBonds?: PersonBond[]
-  personContacts?: PersonContact[]
-  /** People's Business view: every business he is reaching out to. */
-  prospects?: Prospect[]
-  /** The Health page's own permanent PR targets -- see types/gym.ts for why
-   *  these are separate from the main Goals page's periodic ones. */
-  gymGoals?: GymGoal[]
-  /** Invoices, the contacts he bills, and his own supplier row. */
-  invoices?: Invoice[]
-  invoiceClients?: InvoiceClient[]
-  invoiceProfile?: InvoiceProfile[]
-  /** The Pomodoro block running right now, synced so it shows the same on
-   *  every device rather than living only in this tab's
-   *  localStorage. Null means nothing is running. */
-  activeFocus?: ActiveFocus | null
-}
-
-/** Mirrors just enough of pomodoro.tsx's own local state to redraw the clock
- *  elsewhere: which task, how long the block is, and the wall-clock deadline
- *  it ends at (never a countdown number, which would drift the moment the
- *  reader's own clock ticks even one second out of step). `dev` is whichever
- *  device last wrote this, so that device's own effect can tell "I said this"
- *  from "someone else did" and never fights its own echo on the way back down
- *  from Supabase. */
-export interface ActiveFocus {
-  phase: 'focus' | 'break'
-  /** Epoch ms this phase ends at, while running. Null while paused --
-   *  pausedLeft is the number that means something then, same split
-   *  pomodoro.tsx's own endsAt/pausedLeft pair makes, and for the same
-   *  reason: a paused block has no deadline to read a countdown from. */
-  endsAt: number | null
-  /** Seconds left, frozen, while paused. Null while running. */
-  pausedLeft: number | null
-  /** Epoch ms this phase started at. */
-  startedAt: number
-  /** Minutes the running block was started for -- not a setting, the actual
-   *  length, same distinction pomodoro.tsx's own blockMin makes. */
-  blockMin: number
-  /** What it's for, when started from a task. */
-  focusLabel: string | null
-  /** Which task, if any -- lets a reader (another device) show or
-   *  act on the real row rather than just the label text. */
-  taskId?: string
-  space?: SpaceId
-  dev: string
-  updatedAt: number
-}
-
-export type { Undoable }
-
-interface Store extends PersistedState {
-  /** Set or clear one Two Lives link. An empty string removes the key. */
-  setTwoLives: (key: string, url: string) => void
-  /** Replace the reel library with this list, already parsed and deduplicated. */
-  setReels: (list: string[]) => void
-  tunes: string[]
-  setTunes: (list: string[]) => void
-  prompts: PromptItem[]
-  addPrompt: PromptsSlice['addPrompt']
-  updatePrompt: PromptsSlice['updatePrompt']
-  setPromptSent: PromptsSlice['setPromptSent']
-  deletePrompt: PromptsSlice['deletePrompt']
-  ideaBoard: IdeaCard[]
-  addIdeaCard: IdeaBoardSlice['addIdeaCard']
-  updateIdeaCard: IdeaBoardSlice['updateIdeaCard']
-  deleteIdeaCard: IdeaBoardSlice['deleteIdeaCard']
-  reminders: Reminder[]
-  reminderLists: ReminderList[]
-  addReminder: RemindersSlice['addReminder']
-  updateReminder: RemindersSlice['updateReminder']
-  toggleReminder: RemindersSlice['toggleReminder']
-  deleteReminder: RemindersSlice['deleteReminder']
-  addReminderList: RemindersSlice['addReminderList']
-  updateReminderList: RemindersSlice['updateReminderList']
-  deleteReminderList: RemindersSlice['deleteReminderList']
-  people: Person[]
-  personBonds: PersonBond[]
-  personContacts: PersonContact[]
-  addPerson: PeopleSlice['addPerson']
-  updatePerson: PeopleSlice['updatePerson']
-  deletePerson: PeopleSlice['deletePerson']
-  addPersonBond: PeopleSlice['addPersonBond']
-  setBondLabel: PeopleSlice['setBondLabel']
-  removePersonBond: PeopleSlice['removePersonBond']
-  logContact: PeopleSlice['logContact']
-  removeContact: PeopleSlice['removeContact']
-  prospects: Prospect[]
-  addProspect: ProspectsSlice['addProspect']
-  updateProspect: ProspectsSlice['updateProspect']
-  deleteProspect: ProspectsSlice['deleteProspect']
-  logTouch: ProspectsSlice['logTouch']
-  removeTouch: ProspectsSlice['removeTouch']
-  applyOutreach: ProspectsSlice['applyOutreach']
-  gymGoals: GymGoal[]
-  addGymGoal: GymSlice['addGymGoal']
-  updateGymGoal: GymSlice['updateGymGoal']
-  deleteGymGoal: GymSlice['deleteGymGoal']
-  invoices: Invoice[]
-  invoiceClients: InvoiceClient[]
-  invoiceSupplier: InvoiceProfile | undefined
-  saveInvoice: InvoicesSlice['saveInvoice']
-  patchInvoice: InvoicesSlice['patchInvoice']
-  deleteInvoice: InvoicesSlice['deleteInvoice']
-  saveInvoiceClient: InvoicesSlice['saveInvoiceClient']
-  deleteInvoiceClient: InvoicesSlice['deleteInvoiceClient']
-  saveInvoiceProfile: InvoicesSlice['saveInvoiceProfile']
-  /** Record where reel-fetch put the downloaded file for an Instagram link. */
-  setReelFile: (originalUrl: string, fileUrl: string) => void
-  /** What he is looking at. 'all' shows every space at once. */
-  view: ViewId
-  setView: (v: ViewId) => void
-  /** Where a newly created thing lands. In a single space that is the space he is
-   *  in; in All it is whichever space he last worked in, and he can change it. */
-  space: SpaceId
-  setSpace: (s: SpaceId) => void
-  /** Does this record belong in what he is looking at? One predicate, so a page
-   *  never has to know whether it is in a single space or in All. */
-  inView: (s?: SpaceId) => boolean
-  page: PageId
-  setPage: (p: PageId) => void
-  projects: Project[]
-  addProject: (name: string, space: SpaceId) => string | undefined
-  setProjectTag: (id: string, tag: string) => void
-  renameProject: (id: string, name: string) => void
-  setProjectHue: (id: string, hue: string) => void
-  /** 'move' (default meaning, always pass explicitly) clears projectId on its
-   *  tasks and leaves them in the Space's own Plan; 'delete' removes them too. */
-  deleteProject: (id: string, mode: 'move' | 'delete') => void
-  /** Move a task into a project, or out of one back to the Space's own Plan
-   *  with undefined. The task's own space never changes; a project only
-   *  ever holds tasks that already belonged to it. */
-  setTaskProject: (id: string, projectId: string | undefined) => void
-  /** Tie a task to a weekly goal: finishing it adds goalAmt to the goal. */
-  setTaskGoal: (id: string, goalId: string | undefined, goalAmt?: number) => void
-  /** Move a task into a different workspace outright, clearing its project
-   *  (a project only ever holds tasks from its own space, same rule
-   *  setTaskProject already keeps). */
-  setTaskSpace: (id: string, space: SpaceId) => void
-  /** Which Project's Plan is open, or null for the Space's own Plan.
-   *  Deliberately not persisted: a project stays a room you walk into, not a
-   *  mode that survives a reload. Cleared automatically by setPage and
-   *  setView, since every nav tab and every Space is a top-level destination
-   *  a project scope should never survive navigating away to. */
-  openProjectId: string | null
-  setOpenProject: (id: string | null) => void
-  /** People. Not filtered by Space or by inView, same as habits/goals --
-   *  see the type's own note in types.ts for why. */
-  /* True when this device can no longer save. Surfaced in the UI; never silent. */
-  storageFull: boolean
-  /** The one way in: opens a project's Plan without the id being wiped by
-   *  setPage's own clearing (see setPage's note). */
-  enterProject: (id: string) => void
-  /** The day being looked back at, when the route names one. */
-  dayKey: string | null
-  openDay: (iso: string) => void
-  editing: boolean
-  setEditing: (v: boolean) => void
-  focusTaskId: string | null
-  /** Same handoff, for a routine: which one Today wants open and in view on
-   *  the Routines page. Clears itself once read, same as focusTaskId. */
-  focusRoutineId: string | null
-  setFocusRoutineId: (id: string | null) => void
-  /** Same handoff again, for an app: which one the header shelf wants opened
-   *  straight into its frame rather than landing him back on the grid. */
-  focusAppId: string | null
-  setFocusAppId: (id: string | null) => void
-  /** A note another page wants opened, handed over once. The Notes page owns
-   *  which note is on screen; this is only how a link from elsewhere says
-   *  "that one", and it clears itself the moment it is read so a later visit
-   *  does not reopen a note he closed. */
-  noteToOpen: string | null
-  openNote: (id: string | null) => void
-  setFocusTaskId: (id: string | null) => void
-
-
-  toggleTask: (id: string) => void
-  /** Rename a task or change its estimate. With a breakdown present the
-   *  estimate is the sum of its steps, so only the title is editable then. */
-  updateTask: (id: string, patch: { title?: string; estimateMin?: number }) => void
-  logActual: (id: string, actualMin: number) => void
-  /** Returns the new row's id. */
-  addTask: (t: Omit<Task, 'id' | 'done'>) => string
-  addTaskWithSubtasks: (parent: Omit<Task, 'id' | 'done' | 'subtasks'>, subs: { title: string; estimateMin: number }[]) => void
-  /** Put a task on a period in Goals, or take it off again with no horizon. The
-   *  key defaults to the period running now; a Goals column passes its own when
-   *  he is standing in next week. */
-  commitTask: (id: string, horizon?: import('./types').GoalTimeframe, key?: string) => void
-  /** `day` plans it for a day other than today ('YYYY-MM-DD'), which is how
-   *  Sunday evening gets to lay out Monday. */
-  moveTaskList: (id: string, list: 'today' | 'backlog', day?: string) => void
-  moveTasksToToday: (ids: string[], day?: string) => void
-  assignSlot: (id: string, slot: import('./types').TimeSlot | undefined) => void
-  /** Pin a task to a clock time ('HH:MM'), or undefined to unpin it. The slot
-   *  follows the hour, so the two never disagree. */
-  setTaskAt: (id: string, at: string | undefined) => void
-  toggleSubtask: (taskId: string, subId: string) => void
-  /** Rename a step of a task, or change how long it is expected to take. */
-  updateSubtask: (taskId: string, subId: string, patch: { title?: string; estimateMin?: number }) => void
-  /** Add one step to a task by hand. Minutes optional: the first step inherits the task's estimate, later ones default to 15. */
-  addSubtask: (taskId: string, title: string, estimateMin?: number) => void
-  /** Drop a step. A generated breakdown is a suggestion, not a contract. */
-  deleteSubtask: (taskId: string, subId: string) => void
-  logSubtaskActual: (taskId: string, subId: string, actualMin: number) => void
-  deleteTask: (id: string) => void
-  /** Attach generated steps to an existing task; its estimate becomes their sum. */
-  setSubtasks: (taskId: string, subs: { title: string; estimateMin: number }[]) => void
-  /** Ask for a fresh estimate of one task now (the model reads the title; the rule of thumb catches a failed call). */
-  estimateNow: (taskId: string) => Promise<void>
-  /** Set a task's own estimate (used by the per-task estimate action). */
-  setEstimate: (taskId: string, minutes: number) => void
-  /** The Pomodoro block running right now, synced across devices. Null
-   *  clears it (used by stop/finish, and by anything remote that stopped
-   *  it first). */
-  activeFocus: ActiveFocus | null
-  setActiveFocus: (f: ActiveFocus | null) => void
-
-  /** The last day the daily review was walked, and the last day it was skipped. */
-  dailyDone?: string
-  dailySkipped?: string
-  closeDaily: (walked: boolean) => void
-  /** Is the daily review on screen? Held here rather than inside it, so the
-   *  header can open it from any page and not only Today. */
-  dailyOpen: boolean
-  openDaily: () => void
-  toggleHabitDay: (id: string, day: number) => void
-  /** The number a habit is judged by, for today. Logging it IS the tick when it
-   *  clears the target, in one action: the typing test is not "did you open it",
-   *  it is "did you hit the number", and asking him to type the score and then
-   *  also tick a box would let him tick the box on a score that failed. */
-  logHabitNumber: (habitId: string, value: number) => void
-  /** Which of a habit's two answers he took today. One question, one answer:
-   *  picking the other one is a change of mind, not a second thing done, and
-   *  picking the same one again gives the day back. */
-  pickHabitAlt: (habitId: string, altId: string) => void
-  /** Mark a habit kept, or not kept, on a NAMED day. The index version above is
-   *  a position in this week and cannot address last Sunday. */
-  markHabitOn: (id: string, day: string, value: boolean) => void
-  /** Record that a routine-kept habit was in fact done on a past day. */
-  assertRoutineOn: (habitId: string, day: string, force?: boolean) => void
-  /** A slip he is admitting to after the fact, on the day it happened. */
-  logSlipOn: (id: string, day: string) => void
-  /** Assert or retract a PAST day of a routine-driven habit by hand. The
-   *  routine owns today; the record of a day already gone is his to correct,
-   *  because a lost write must never be a permanent lie. */
-  assertRoutineDay: (habitId: string, dayIndex: number) => void
-  markHabitDay: (id: string, day: number, value: boolean) => void
-  /** Many dates on one habit, one state update. See markDaysOn's own comment. */
-  markHabitDaysOn: (id: string, days: string[], value: boolean) => void
-  addHabit: (input: { name: string; daypart?: import('./types').TimeSlot; frequency: import('./types').HabitFrequency; targetPerWeek?: number; kind?: import('./types').HabitKind; dailyTargetMin?: number; measure?: 'minutes' | 'times' | 'amount'; per?: import('./types').CountPeriod; targetCount?: number; source?: import('./types').HabitSource; quitSince?: string; startedOn?: string; unit?: string; targetAmount?: number; presets?: number[]; color?: string; icon?: string; dailyCost?: number }) => void
-  /** Record a slip on a habit you are trying to stop; resets the clean run. */
-  logSlip: (id: string) => void
-  togglePauseHabit: (id: string) => void
-  updateHabit: (id: string, patch: Partial<Pick<HabitDef, 'name' | 'daypart' | 'frequency' | 'targetPerWeek' | 'kind' | 'dailyTargetMin' | 'measure' | 'per' | 'targetCount' | 'source' | 'quitSince' | 'startedOn'>>) => void
-  deleteHabit: (id: string) => void
-
-  addGoal: (g: Omit<Goal, 'id'>) => void
-  updateGoal: (id: string, patch: Partial<Omit<Goal, 'id' | 'space'>>) => void
-  bumpGoal: (id: string, delta: number) => void
-  toggleGoalMilestone: (goalId: string, milestoneId: string) => void
-  deleteGoal: (id: string) => void
-  /** Start the same goal again for the current period. */
-  /** Returns the id of the goal now sitting in the current period, whether
-   *  freshly made or already there from an earlier click. */
-  repeatGoal: (id: string) => string | null
-
-  assistantLog: AssistantEntry[]
-
-  /* Avoidance, the page, is gone. These sessions are not: they are dated
-     records of things he faced, so they keep loading, keep syncing and keep
-     showing on a day page. Nothing new writes to them. */
-  coachSessions: CoachSession[]
-
-  routines: Routine[]
-  toggleRoutineStep: (routineId: string, stepId: string) => void
-  /** Pick one of a step's alternatives, which ticks the step. Picking the same
-   *  one again unpicks it. */
-  toggleRoutineAlt: (routineId: string, stepId: string, altId: string) => void
-  /** Finish or reopen a whole routine at once, the way ticking a task with
-   *  subtasks finishes all of them. */
-  setRoutineDone: (routineId: string, done: boolean) => void
-  /** Put a routine on a day's list before it is started, so a day can be planned
-   *  and not only recorded. `slot` undefined takes it back off the list, and
-   *  `day` defaults to today. */
-  planRoutine: (routineId: string, slot?: import('./types').TimeSlot, day?: string) => void
-  /** Log one occurrence of a counted habit, or take the last one back. */
-  logCount: (habitId: string, delta: 1 | -1) => void
-  /** An amount habit (water in ml): one dated row per log. Returns the row's
-   *  src, which is what removeAmount takes to undo exactly that log. */
-  logAmount: (habitId: string, v: number) => string | undefined
-  removeAmount: (habitId: string, src: string) => void
-  /** A typed amount on a goal, with an optional note. Returns the entry id. */
-  logGoalAmount: (id: string, v: number, note?: string) => string
-  removeGoalEntry: (id: string, entryId: string) => void
-  addRoutineWithSteps: (input: { title: string; cadence: RoutineCadence; daypart?: import('./types').TimeSlot; steps: string[]; color?: string; icon?: string; repeatable?: boolean }) => void
-  setLook: (kind: 'habit' | 'routine' | 'goal', id: string, look: { color?: string; icon?: string; dailyCost?: number; presets?: number[]; name?: string; daypart?: import('./types').TimeSlot | null }) => void
-  /** A routine and the habit that mirrors it are created together, so finishing
-   *  it always has somewhere to land. */
-  addRoutine: (input: { title: string; cadence: RoutineCadence; blurb?: string; daypart?: import('./types').TimeSlot }) => void
-  updateRoutine: (id: string, patch: Partial<Pick<Routine, 'title' | 'cadence' | 'blurb'>>) => void
-  deleteRoutine: (id: string) => void
-  addRoutineStep: (routineId: string, step: { title: string; note?: string; link?: string; linkLabel?: string }) => void
-  deleteRoutineStep: (routineId: string, stepId: string) => void
-  /** Personal bests, keyed by `routineId:stepId`. Never cleared by a rollover. */
-  records: Record<string, number>
-
-  /** Finished focus blocks, newest first. Trimmed to a year. */
-  focusSessions: FocusSession[]
-  /** Called when a focus block finishes; feeds measured habits and the ledger. */
-  logFocus: (minutes: number, label?: string) => void
-  /** Log a finished stretch of focus onto a SPECIFIC day. The half of a block
-   *  worked before midnight belongs to the day it was worked on. */
-  logFocusOn: (day: string, minutes: number, label?: string, at?: string) => void
-  /** Correct a focus block: its length, or what it was for. */
-  updateFocus: (id: string, patch: { minutes?: number; label?: string }) => void
-  /** Remove a focus block, and the ledger row it wrote with it. */
-  deleteFocus: (id: string) => void
-  /** Keep any auto habit whose measured total has reached its threshold. The
-   *  running block counts: `extraMin` is what the timer has on the clock now. */
-  syncAutoHabits: (extraMin?: number, label?: string) => void
-
-  /** Every dated habit tick and routine completion. The record days[] caches. */
-  habitLog: HabitTick[]
-  routineLog: RoutineDone[]
-  /** Every dated slip, and every dated number a routine step recorded. */
-  slips: HabitSlip[]
-  stepLog: StepEntry[]
-  stepTicks: StepTick[]
-  dayLog: DayTaskLog[]
-
-  /* Where the copy on screen last came from, when that was another device.
-     Null means this one, which is the ordinary case and needs no words. */
-  syncOrigin: { name: string; at: number } | null
-
-  /* ---- Notes ----
-     The folder is the note's address and its workspace both: move a note into
-     another workspace's folder and it changes workspace, because two places
-     recording the same fact is how they end up disagreeing. */
-  notes: Note[]
-  noteFolders: NoteFolder[]
-  /** Makes an empty note in that folder and hands back its id to open. */
-  addNote: (folderId: string, body?: string) => string
-  updateNote: (id: string, patch: Partial<Pick<Note, 'title' | 'body' | 'color' | 'pinned'>>) => void
-  /** Tick a note off, or put it back. */
-  setNoteDone: (id: string, done: boolean) => void
-  moveNote: (id: string, folderId: string) => void
-  deleteNote: (id: string) => void
-  /** The losing body from another device: take it into this note, or drop it. */
-  keepNoteConflict: (id: string) => void
-  dropNoteConflict: (id: string) => void
-  addNoteFolder: (space: SpaceId, name: string) => string
-  renameNoteFolder: (id: string, name: string) => void
-  /** Deletes the folder only. Its notes move up to the workspace folder, because
-   *  a folder is a shelf and emptying a shelf does not burn the books. */
-  deleteNoteFolder: (id: string) => void
-  /** Rewrites a tag everywhere it appears. A tag you cannot rename is a tag you
-   *  stop using once it is misspelled. */
-  renameNoteTag: (from: string, to: string) => void
-
-  /** The last delete, still takeable back. Null once it is taken back or expires. */
-  undoable: Undoable | null
-  undoDelete: () => void
-  dismissUndo: () => void
-
-  todayIndex: number
-  /** This week's ledger rows for the active profile; savedMin/accuracy derive from it. */
-  weekLedger: LedgerEntry[]
-  savedMin: number
-  accuracyPct: number
-  resetDemo: () => void
-}
-
-const Ctx = createContext<Store | null>(null)
-
-function loadPersisted(): PersistedState | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-
-    /* Copy the raw blob aside before a single transform runs, and never touch it
-       again. Everything below rewrites his saved state in place; if any of it is
-       wrong, this is the copy that gets him back. */
-    try {
-      if (localStorage.getItem(BACKUP_KEY) !== raw) localStorage.setItem(BACKUP_KEY, raw)
-    } catch { /* a full quota must not stop the app loading */ }
-
-    const p = JSON.parse(raw) as PersistedState
-    /* Refuse only a blob from a FUTURE version, which this build cannot
-       understand. Refusing an older one returned null, which seeded the mock
-       data and then wrote it straight over his real state on the first change.
-       That was the most dangerous line in the file. */
-    if ((p.version ?? 0) > 3) { futureBlob = true; return null }
-    if (p.schema && p.schema !== STORAGE_KEY) return null
-    p.version = 3
-    p.removedSeeds = p.removedSeeds ?? []
-
-    /* A plan is for a day. Yesterday's cannot be allowed to sit on this morning's
-       list pretending it was chosen. Tomorrow's is a different matter: he put it
-       there on purpose and it has not had its day yet, so only the past is
-       swept. */
-    {
-      const today = localDateKey()
-      p.routines = (p.routines ?? []).map((r) => (r.planned && r.planned.day < today ? { ...r, planned: undefined } : r))
-    }
-
-    /* Week rollover: when the saved state belongs to an earlier ISO week, each
-       habit's checkmarks are archived into its 12-week history and cleared, so
-       Monday always starts a fresh row instead of showing last week's ticks. */
-    const wk = isoWeekKey()
-
-    /* One-time migration to the dated habit log. Whatever is ticked in the week
-       array right now becomes dated entries, so nothing he has logged is lost by
-       moving to the durable record. history[] holds twelve undated weekly counts
-       and stays exactly as it is: inventing dates for it would be fabrication,
-       and the new log simply starts here and grows. */
-    if (!p.habitLog) {
-      const ticks: HabitTick[] = []
-      // Ticks belong to the week the saved state was written in, not to this one.
-      const base = p.weekKey === wk ? new Date() : null
-      if (base) {
-        for (const h of p.habits ?? []) {
-          h.days.forEach((on, i) => { if (on) ticks.push({ habitId: h.id, day: dayOfWeekKey(i, base) }) })
-        }
-      }
-      p.habitLog = ticks
-    }
-    /* The one date each quit habit was carrying becomes the first record in its
-       slip history. Everything after it is appended rather than overwriting. */
-    if (!p.slips) {
-      p.slips = (p.habits ?? [])
-        .filter((h) => h.kind === 'break' && h.lastSlip)
-        .map((h) => ({ habitId: h.id, day: h.lastSlip as string }))
-    }
-    if (!p.stepLog) {
-      /* What is in stepData belongs to the period it was recorded in, and the
-         only date that period gives us for certain is a daily one. A weekly or
-         monthly routine's current number has no day, so it starts the series
-         from the next one he logs rather than inventing a date for it. */
-      p.stepLog = (p.routines ?? []).flatMap((r) =>
-        r.cadence === 'weekly' || r.cadence === 'monthly' || !r.periodKey
-          ? []
-          : Object.entries(r.stepData ?? {}).map(([stepId, value]) => ({ routineId: r.id, stepId, day: r.periodKey as string, value })),
-      )
-    }
-    if (!p.routineLog) {
-      // A routine that is currently complete carries the day it was completed.
-      p.routineLog = (p.routines ?? [])
-        .filter((r) => r.completedOn && routineComplete(r, periodKeyFor(r.cadence)))
-        .map((r) => ({ routineId: r.id, day: r.completedOn as string, periodKey: r.periodKey ?? periodKeyFor(r.cadence) }))
-    }
-
-    /* A row written before spaces existed has no space, which used to mean it
-       counted everywhere. Stamp it once, and record that it was a guess rather
-       than something he chose, so the number is at least in one place only. */
-    {
-      let guessed = 0
-      const stamp = <T extends { space?: SpaceId }>(rows: T[] | undefined) =>
-        (rows ?? []).map((r) => (r.space ? r : (guessed++, { ...r, space: 'personal' as SpaceId })))
-      p.ledger = stamp(p.ledger)
-      p.coachSessions = stamp(p.coachSessions)
-      p.focusSessions = stamp(p.focusSessions)
-      if (guessed) p.spaceGuessed = (p.spaceGuessed ?? 0) + guessed
-    }
-
-    /* Everything that has to happen because time passed happens in one place,
-       walking from the day it last ran. Each of these used to be its own "is the
-       saved week this week?" test, each firing once no matter how long the gap. */
-    roll(p)
-
-    /* A goal whose period has ended stops counting and keeps the number it
-       finished on. Nothing is deleted: it moves to the past, where he can look
-       at how it went and set it again if he wants to. */
-    const renewals: Goal[] = []
-    p.goals = (p.goals ?? []).map((g) => {
-      const tf = (g.timeframe ?? 'quarter') as GoalTf
-      const key = g.periodKey ?? goalPeriodKey(tf)
-      if (g.closed || !periodIsPast(tf, key)) return { ...g, periodKey: key }
-      const range = goalPeriodRange(tf, key)
-      const final = goalCurrent(g, p.habits ?? [], p.habitLog ?? [], range, p.slips ?? [], p.focusSessions ?? [])
-      /* A goal that counts ITSELF renews itself: three hours of focus a week is
-         a standing bar, not a one-off, and making him re-set it every Monday is
-         how the bar quietly disappears. The closed one keeps its result; a
-         fresh copy opens for the period we are in now. Hand-logged goals stay
-         one-off, with "Set it again" for the ones he wants back. */
-      if (g.habitId) {
-        renewals.push({
-          ...g, id: `${g.id}-r${goalPeriodKey(tf).replace(/[^0-9A-Za-z]/g, '')}`,
-          current: 0, milestones: [], closed: undefined, periodKey: goalPeriodKey(tf),
-        })
-      }
-      return { ...g, periodKey: key, closed: { on: range.to, final } }
-    })
-    for (const r of renewals) {
-      const dupe = p.goals.some((g) => !g.closed && g.habitId === r.habitId && g.name === r.name
-        && (g.timeframe ?? 'quarter') === (r.timeframe ?? 'quarter') && g.periodKey === r.periodKey)
-      if (!dupe) p.goals.push(r)
-    }
-
-    /* A day that has not happened yet cannot have been kept. The week array has
-       always been cleaned of future ticks; the log has to be cleaned the same way
-       or the two disagree the moment a migration or a clock change writes one. */
-    p.habitLog = (p.habitLog ?? []).filter((t) => t.day <= localDateKey())
-    p.routineLog = (p.routineLog ?? []).filter((r) => r.day <= localDateKey())
-
-    /* A start date that never got its days. The date field shipped one build
-       before the filling did, so a habit he had been keeping since July sat at
-       0/7 with the date sitting right there on its card. Every habit carrying a
-       start it has not been filled for gets those days written now, up to
-       yesterday. Marked by filledSince, so this runs once per date and a day he
-       unticks afterwards stays unticked. Runs before the week cache below, which
-       then picks it up for free. */
-    {
-      const today = localDateKey()
-      const filled: HabitTick[] = []
-      p.habits = (p.habits ?? []).map((h) => {
-        if (h.kind === 'break' || !h.startedOn || h.filledSince) return h
-        const have = new Set((p.habitLog ?? []).filter((t) => t.habitId === h.id).map((t) => t.day))
-        const cursor = new Date(`${h.startedOn}T12:00:00`)
-        const end = new Date(`${today}T12:00:00`)
-        if (!Number.isNaN(cursor.getTime())) {
-          while (cursor < end) {
-            const key = localDateKey(cursor)
-            if (!have.has(key)) filled.push({ habitId: h.id, day: key, src: 'since' })
-            cursor.setDate(cursor.getDate() + 1)
-          }
-        }
-        return { ...h, filledSince: h.startedOn }
-      })
-      if (filled.length) p.habitLog = [...(p.habitLog ?? []), ...filled]
-    }
-
-    /* The week array is a cache. Rebuilding it from the log on every load means
-       the log is the one truth and the two can never drift apart. */
-    {
-      const thisWeek = new Set(
-        (p.habitLog ?? [])
-          .filter((t) => isoWeekKey(new Date(t.day)) === wk)
-          .map((t) => `${t.habitId}|${t.day}`),
-      )
-      /* An amount habit's day is kept by its TOTAL, not by any one row: a
-         glass of water is a log, 2.5 litres is the day. */
-      const amountSum = new Map<string, number>()
-      for (const t of p.habitLog ?? []) if (t.v != null && isoWeekKey(new Date(t.day)) === wk) amountSum.set(`${t.habitId}|${t.day}`, (amountSum.get(`${t.habitId}|${t.day}`) ?? 0) + t.v)
-      p.habits = p.habits.map((h) => ({
-        ...h,
-        days: Array.from({ length: 7 }, (_, i) => h.measure === 'amount'
-          ? (amountSum.get(`${h.id}|${dayOfWeekKey(i)}`) ?? 0) >= (h.targetAmount ?? 1)
-          : thisWeek.has(`${h.id}|${dayOfWeekKey(i)}`)),
-      }))
-    }
-
-    /* ROUTINES BECOME PARTS OF THE DAY (his call, 2026-10-26): every habit a
-       routine holds takes that routine's part of the day, once, as he approved
-       it: wake-up, morning preparation and both work routines in the Morning,
-       night work and bed in the Evening, and the weekly, monthly and on-demand
-       ones at Any time (they keep their own rhythm). After that the part is
-       his: `partSet` stops this from ever putting one back. Nothing is removed;
-       the routine rows still drive Today, Plan and the widgets. */
-    {
-      const PART: Record<string, import('./types').TimeSlot> = { 'r-wakeup': 'morning', 'r-morning': 'morning', 'r-prework': 'morning', 'r-workroutine': 'morning', 'r-nightwork': 'evening', 'r-evening': 'evening' }
-      const routineOf = new Map((p.routines ?? []).map((r) => [r.id, r]))
-      p.habits = p.habits.map((h) => {
-        if (!h.folderId || h.partSet) return h
-        const r = routineOf.get(h.folderId)
-        const rare = !!r && (r.cadence === 'weekly' || r.cadence === 'monthly' || (!!r.repeatable && r.cadence === 'daily'))
-        const mirror = r?.habitId ? p.habits.find((x) => x.id === r.habitId) : undefined
-        const daypart = rare ? undefined : (PART[h.folderId] ?? mirror?.daypart ?? h.daypart)
-        return { ...h, daypart, partSet: true }
-      })
-    }
-
-    /* A rename of a SEEDED row has to reach state that already exists. Renaming
-       it in the seed alone did nothing here: routines and habits are his once
-       they exist, so the loader never touches their titles, and the new name
-       only ever appeared on a fresh install. This renames the seeded row only
-       while it still carries the exact old name, so anything he has renamed
-       himself is left alone and running it twice changes nothing. */
-    {
-      const renames: [string, string, string][] = [['r-evening', 'Evening shutdown', 'Before bed routine'], ['r-weekly', 'Weekly reset', 'Weekly review'], ['r-morningwork', 'Morning work routine', 'Morning Big Time work routine'], ['r-morning', 'Morning routine', 'Morning Preparation'], ['r-prework', 'Before work', 'Before work routine']]
-      for (const [id, was, now] of renames) {
-        p.routines = (p.routines ?? []).map((r) => (r.id === id && r.title === was ? { ...r, title: now } : r))
-        const hid = (p.routines ?? []).find((r) => r.id === id)?.habitId
-        p.habits = (p.habits ?? []).map((h) => ((h.id === hid || h.id === id.replace(/^r-/, 'h-')) && h.name === was ? { ...h, name: now } : h))
-      }
-    }
-
-    /* Forward-fill fields added after this state was saved, so an existing
-       install picks up new wiring (habit frequencies, habit-linked goals)
-       without losing anything he has logged. Only ever fills a blank. */
-    const seedH = new Map(MOCK_HABITS.map((h) => [h.id, h]))
-    p.habits = p.habits.map((h) => {
-      const s = seedH.get(h.id)
-      return s ? { ...h, frequency: h.frequency ?? s.frequency, targetPerWeek: h.targetPerWeek ?? s.targetPerWeek } : h
-    })
-    // A seeded habit added later is missing entirely; append it rather than reseed.
-    const removed = new Set(p.removedSeeds ?? [])
-    for (const s of MOCK_HABITS) if (!removed.has(s.id) && !p.habits.some((h) => h.id === s.id)) p.habits.push(s)
-    /* Same for a seeded ROUTINE added after this state was saved. Routines are
-       his once they exist, so the loader hands his own list straight back and a
-       new seed would otherwise only ever appear on a fresh install, which is
-       exactly how the renamed evening routine went missing. Appending one row
-       adds nothing to what he has already written, and a routine he deleted is
-       in removedSeeds, so this cannot resurrect it. */
-    p.routines = p.routines ?? []
-    for (const s of MOCK_ROUTINES) if (!removed.has(s.id) && !p.routines.some((r) => r.id === s.id)) p.routines.push(s)
-
-    /* Asked for again. The loader is right never to resurrect a routine on its
-       own, so a routine deleted months ago stays deleted, and one of these was
-       missing from his own state for exactly that reason. But him naming it
-       again is not the same as never having deleted it: these four he asked for
-       by name on 2026-08-02, so each comes back once with its habit, its
-       deletion mark cleared, and behaves like any other seeded row afterwards.
-       A routine still present is not touched. */
-    if (!p.removedSeeds?.includes('fix:asked-again-2026-08-02')) {
-      p.removedSeeds = [...(p.removedSeeds ?? []), 'fix:asked-again-2026-08-02']
-      for (const id of ['r-prework', 'r-morningwork', 'r-nightwork', 'r-invoicing']) {
-        const seed = MOCK_ROUTINES.find((r) => r.id === id)
-        if (!seed || p.routines.some((r) => r.id === id)) continue
-        p.removedSeeds = p.removedSeeds.filter((m) => m !== id && m !== seed.habitId)
-        p.routines.push(seed)
-        const h = MOCK_HABITS.find((x) => x.id === seed.habitId)
-        if (h && !p.habits.some((x) => x.id === h.id)) p.habits.push(h)
-      }
-    }
-
-    /* A step added to a seeded routine after this state was saved has to reach
-       it, and a whole-list seed cannot do that once the routine has any steps at
-       all. So each seeded step is handed over ONCE, at the position it holds in
-       the seed, and the fact that it was handed over is remembered. Delete it
-       afterwards and it stays deleted, which is the whole point of the marker:
-       the app fills gaps, it does not overrule him. */
-    p.removedSeeds = p.removedSeeds ?? []
-    for (const s of MOCK_ROUTINES) {
-      if (!s.steps.length) continue
-      const mine = p.routines.find((r) => r.id === s.id)
-      if (!mine) continue
-      const block = `${s.id}:steps`
-      /* The whole list, once, and only while he has written none of his own. */
-      if (mine.steps.length === 0 && !p.removedSeeds.includes(block)) {
-        p.routines = p.routines.map((r) => (r.id === s.id ? { ...r, steps: s.steps } : r))
-        p.removedSeeds.push(block, ...s.steps.map((st) => `${s.id}:step:${st.id}`))
-        continue
-      }
-      /* Into a list he already has, only a step that was added after that list
-         was delivered, at the position it holds in the seed. Everything else was
-         handed over long ago, so its absence means he deleted it. */
-      let steps = mine.steps
-      s.steps.forEach((st, i) => {
-        const mark = `${s.id}:step:${st.id}`
-        if (!LATE_STEPS.has(st.id) || p.removedSeeds!.includes(mark) || steps.some((x) => x.id === st.id)) return
-        steps = [...steps.slice(0, i), st, ...steps.slice(i)]
-        p.removedSeeds!.push(mark)
-      })
-      if (steps !== mine.steps) p.routines = p.routines.map((r) => (r.id === s.id ? { ...r, steps } : r))
-    }
-
-    /* Wiring a step gained after his list was saved: a habit it keeps, or the
-       fact that it is optional. Steps are his, so this fills a blank and never
-       overwrites, reaching the rows he already has without touching a word of
-       what they say. */
-    for (const s of MOCK_ROUTINES) {
-      const seeded = new Map(s.steps.map((st) => [st.id, st]))
-      p.routines = p.routines.map((r) => (r.id !== s.id ? r : {
-        ...r,
-        steps: r.steps.map((st) => {
-          const from = seeded.get(st.id)
-          if (!from) return st
-          return {
-            ...st,
-            habitId: st.habitId ?? from.habitId,
-            optional: st.optional ?? from.optional,
-          }
-        }),
-      }))
-    }
-
-    /* A seeded step that has since MOVED in the seed. Order is his the moment he
-       touches it, so this runs once and then never again: the marker is what
-       stops a step he has deliberately dragged elsewhere from being pulled back
-       into place on every reload. */
-    const moves: [string, string, number][] = [['r-brainrot', 'br-ice', 0]]
-    for (const [rid, sid, to] of moves) {
-      const mark = `${rid}:step:${sid}:at${to}`
-      if (p.removedSeeds.includes(mark)) continue
-      p.removedSeeds.push(mark)
-      p.routines = p.routines.map((r) => {
-        if (r.id !== rid) return r
-        const step = r.steps.find((x) => x.id === sid)
-        if (!step) return r
-        const rest = r.steps.filter((x) => x.id !== sid)
-        return { ...r, steps: [...rest.slice(0, to), step, ...rest.slice(to)] }
-      })
-    }
-
-    /* A day that has not happened yet cannot be done. Future ticks were also
-       unreachable, since those dots are disabled, so they could never be undone. */
-    const todayIdx = (new Date().getDay() + 6) % 7
-    p.habits = p.habits.map((h) => ({ ...h, days: h.days.map((d, i) => (i > todayIdx ? false : d)) }))
-
-    /* A habit a routine drives is a read-out of that routine, and its dots are
-       not clickable, so a wrong value there can never be corrected by hand. It
-       is therefore re-derived on every load, from HIS routines. It used to read
-       LATE_STEPS,
-  MOCK_ROUTINES, which meant the moment he wrote his own steps the mock's
-       list (empty, for four of them) decided the answer: the tick was wiped on
-       the next reload, or asserted for a routine he had not finished. */
-    const savedRoutines = p.routines ?? []
-    const drivenNow = new Map(
-      /* A step-less routine owns nothing yet: its habit is hand-ticked until
-         steps exist, and this pass must not wipe those ticks on every load. */
-      savedRoutines.filter((r) => r.habitId && !r.archivedAt && r.steps.length > 0).map((r) => {
-        const complete = routineComplete(r, periodKeyFor(r.cadence))
-        return [r.habitId as string, { complete, on: complete ? (r.completedOn ?? localDateKey()) : null }]
-      }),
-    )
-    const seededPastCleared = p.fixes ?? 0
-    const thisWeek = isoWeekKey()
-    p.habits = p.habits.map((h) => {
-      const d = drivenNow.get(h.id)
-      if (!d) return h
-      /* The tick belongs to the day it was earned, not to today. A weekly
-         routine finished on Tuesday keeps Tuesday's dot for the rest of the
-         week, and loses THAT dot when it is undone on Friday. */
-      const idx = d.on && isoWeekKey(new Date(d.on)) === thisWeek ? dayIndexOf(d.on) : null
-      const days = h.days.map((day, i) => {
-        if (!d.complete) return seededPastCleared >= 1 && i !== todayIdx ? day : false
-        /* The real completion day may not be in THIS week at all: a monthly
-           routine finished early in the month stays complete for weeks after,
-           and there is no day in a 7-slot week to honestly place that on.
-           Forcing today's dot here used to be the fallback, which is why a
-           monthly review read as "done today" on every day it was reopened.
-           keptThisPeriod (types.ts) is what now tells weekly/monthly consumers
-           it is kept; this array only ever states a real day. */
-        return idx !== null ? i === idx : day
-      })
-      return { ...h, days }
-    })
-    p.fixes = 1
-
-    /* A goal already linked to a time habit was filed in 'checkoffs' before
-       hours existed. The unit follows what the habit actually measures. */
-    p.goals = (p.goals ?? []).map((g) => {
-      const h = g.habitId ? (p.habits ?? []).find((x) => x.id === g.habitId) : undefined
-      return h && isTimeFed(h) && g.unit === 'checkoffs' ? { ...g, unit: 'hours' } : g
-    })
-
-    const seedG = new Map(MOCK_GOALS.map((g) => [g.id, g]))
-    p.goals = p.goals.map((g) => {
-      const s = seedG.get(g.id)
-      return s?.habitId && !g.habitId ? { ...g, habitId: s.habitId, unit: s.unit } : g
-    })
-
-
-    /* Sleep before 1 AM, 2026-10-04: his one health habit had never been made,
-       so the morning recap could not ask about it. Started yesterday so
-       tonight's recap asks. Fixed id, so two devices make the same row. */
-    if (!p.removedSeeds.includes('fix:sleep-habit')) {
-      p.removedSeeds.push('fix:sleep-habit')
-      if (!(p.habits ?? []).some((h) => h.id === 'h-sleep-1am' || h.name.trim().toLowerCase() === 'sleep before 1 am')) {
-        const y = new Date(); y.setDate(y.getDate() - 1)
-        const start = localDateKey(y)
-        p.habits = [...(p.habits ?? []), {
-          id: 'h-sleep-1am', space: 'personal', name: 'Sleep before 1 AM', daypart: 'evening', frequency: 'daily', kind: 'build',
-          startedOn: start, filledSince: start, days: [false, false, false, false, false, false, false], paused: false,
-        }]
-      }
-    }
-
-    /* Two workspaces, 2026-10-02: Off-Plate and Michael's Corner are projects
-       inside Personal now. Idempotent, so it also runs on states that arrive
-       from a device still on the old bundle (see applyExternal). */
-    foldSpaces(p as unknown as Record<string, unknown>, localDateKey())
-    return p
-  } catch {
-    return null
-  }
-}
-
-/* One route carries an argument: a past day. '#/day/2026-07-14' is a real
-   address, so a date anywhere in the app can simply link to the day it names. */
-function routeFromHash(): { page: PageId; day: string | null } {
-  const h = location.hash.replace('#/', '')
-  const m = h.match(/^day\/(\d{4}-\d{2}-\d{2})$/)
-  if (m) return { page: 'day', day: m[1] }
-  // The give-up screen lives on the Jar page; the Jar reads the same hash.
-  if (h === 'give-up') return { page: 'timeline', day: null }
-  const pages: PageId[] = ['today', 'plan', 'projects', 'habits', 'routines', 'goals', 'quitting', 'settings', 'notes', 'bills', 'mymind', 'reminders', 'revolut', 'invoices', 'focus', 'board', 'zone', 'apps', 'calendar', 'assistant', 'timeline', 'skills', 'health', 'gym', 'longevity', 'watchless', 'ideas', 'prompts', 'people', 'business', 'clients', 'meetings', 'outreach']
-  return { page: (pages as string[]).includes(h) ? (h as PageId) : 'today', day: null }
-}
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const persisted = useMemo(loadPersisted, [])
   const [storageFull, setStorageFull] = useState(false)
-  const [ledger, setLedger] = useState(persisted?.ledger ?? MOCK_LEDGER)
   const connectionsSlice = useConnectionsSlice(persisted)
   const { ideas, setIdeas } = connectionsSlice
   const coachSlice = useCoachSlice(persisted)
   const { coachSessions, setCoachSessions } = coachSlice
-  const [focusSessions, setFocusSessions] = useState<FocusSession[]>(persisted?.focusSessions ?? [])
   /* The one Pomodoro block running right now, if any -- separate from
      focusSessions, which only ever holds FINISHED blocks. PomodoroProvider
      owns the countdown itself (still its own localStorage clock, see
@@ -1173,6 +255,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [focusRoutineId, setFocusRoutineId] = useState<string | null>(null)
   const [focusAppId, setFocusAppId] = useState<string | null>(null)
   const [noteToOpen, setNoteToOpen] = useState<string | null>(null)
+  /* Finished work: the ledger, the focus blocks, and the completions that
+     write both (store/ledger.ts). After the planner and growth slices, since
+     it reads tasks, habits and goals from them. */
+  const ledgerSlice = useLedgerSlice(persisted, {
+    space, inView, tasks, setTasks, habits, setHabits, habitLog, setHabitLog, editHabitLog,
+    goals, bumpGoal: growthSlice.bumpGoal, armUndo, bury, digUp,
+  })
+  const { ledger, setLedger, focusSessions, setFocusSessions, weekLedger, savedMin, accuracyPct, autoFrom, creditGoal, logFocusOn } = ledgerSlice
 
   useEffect(() => {
     /* Business mode owns the accent while it is on (App.tsx). */
@@ -1250,7 +340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Refuse to write over state a newer build saved.
-    if (futureBlob) return
+    if (isReadOnly()) return
 
     const state: PersistedState = {
       version: 3, tasks, habits, goals, projects, ledger, plan, review, assistantLog, coachSessions, routines, ideas,
@@ -1396,7 +486,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      below for why that pattern is not always free. */
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY || !e.newValue || futureBlob) return
+      if (e.key !== STORAGE_KEY || !e.newValue || isReadOnly()) return
       applyExternalRef.current(e.newValue)
     }
     window.addEventListener('storage', onStorage)
@@ -1412,14 +502,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      interval down and started a fresh one -- the 60s pull almost never
      survived long enough to fire, and the in-flight pull's result was
      discarded by the `if (stop) return` on teardown. Empty deps now, so this
-     sets up exactly once. futureBlob can flip true after mount (loading a
+     sets up exactly once. isReadOnly() can flip true after mount (loading a
      blob from a newer app version), so it's checked fresh inside pull()
      itself rather than only once here at setup. */
   useEffect(() => {
     if (!SUPABASE_ENABLED) return
     let stop = false
     const pull = async () => {
-      if (futureBlob || document.visibilityState !== 'visible') return
+      if (isReadOnly() || document.visibilityState !== 'visible') return
       const remote = await loadRemoteState()
       if (stop) return
       if (remote) applyExternalRef.current(remote)
@@ -1499,92 +589,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      habits use the real weekday so checking off feels true. */
   const todayIndex = (new Date().getDay() + 6) % 7
 
-  /* "This week" means this week: only rows from the current ISO week count, and
-     only from the profile you are looking at. Rows seeded by the demo carry no
-     week/space and are treated as this week's so the demo still shows numbers.
-     Net, including overruns; the headline equals the sum of the visible rows. */
-  const weekLedger = ledger.filter(
-    (e) => (!e.weekKey || e.weekKey === isoWeekKey()) && inView(e.space),
-  )
-  const savedMin = weekLedger.reduce((acc, e) => acc + (e.estimateMin - e.actualMin), 0)
-  const accuracyPct = Math.round(
-    (weekLedger.filter((e) => Math.abs(e.actualMin - e.estimateMin) <= e.estimateMin * 0.25).length /
-      Math.max(1, weekLedger.length)) * 100,
-  )
-
-  /* A habit the app keeps for him. Focus minutes are already measured, so a
-     habit that only says "did you focus for an hour" should never need a tick:
-     it reads the total and answers itself. `extra` is the block currently on the
-     clock, because an hour that is still running is still an hour. The rule runs
-     over every day in the record, so correcting or deleting a block takes back a
-     day it no longer earns. */
-  const autoFrom = (sessions: FocusSession[], extra: number, extraLabel?: string) => {
-    const today = todayKey()
-    const rules = habits.filter((h) => h.auto?.from === 'focus' && !h.archivedAt)
-    if (!rules.length) return
-    const days = new Set(sessions.map((s) => s.day))
-    days.add(today)
-    let next = habitLog
-    for (const h of rules) {
-      const src = `auto:focus:${h.id}`
-      for (const day of days) {
-        const mins = sessions.filter((s) => s.day === day).reduce((a, s) => a + s.minutes, 0)
-          + (day === today ? extra : 0)
-        const has = next.some((t) => t.habitId === h.id && t.day === day && t.src === src)
-        const earns = mins >= focusNeedMin(h)
-        if (earns && !has) next = [...next, { habitId: h.id, day, src, at: day === today ? new Date().toISOString() : undefined }]
-        if (!earns && has) next = next.filter((t) => !(t.habitId === h.id && t.day === day && t.src === src))
-      }
-    }
-    if (next === habitLog) return
-    editHabitLog(next)
-    const idx = (new Date().getDay() + 6) % 7
-    setHabits((prev) => prev.map((h) => (rules.some((r) => r.id === h.id)
-      ? { ...h, days: h.days.map((d, i) => (i === idx ? next.some((t) => t.habitId === h.id && t.day === today) : d)) }
-      : h)))
-  }
-
-  /* One writer for finished focus, whatever day it belongs to. A block that
-     crosses midnight banks its first half onto yesterday through this exact
-     path, so both halves look identical to everything downstream. */
-  /* Which workspace a block's WORK belongs to: the task it names, wherever he
-     happened to be standing when the timer rang. Big Time work done while the
-     app showed Personal is still Big Time work. */
-  const spaceOfLabel = (label?: string): SpaceId => {
-    if (label) {
-      const want = label.trim().toLowerCase()
-      const t = tasks.find((x) => x.title.trim().toLowerCase() === want)
-      if (t) return t.space
-      const holder = tasks.find((x) => x.subtasks?.some((st) => st.title.trim().toLowerCase() === want))
-      if (holder) return holder.space
-    }
-    return space
-  }
-
-  const logFocusOn = (day: string, minutes: number, label?: string, at?: string) => {
-    if (minutes <= 0) return
-    const mins = Math.round(minutes)
-    const lid = newId('l')
-    const next = [{ id: newId('f'), day, minutes: mins, label, space: spaceOfLabel(label), ledgerId: lid, at: at ?? new Date().toISOString() }, ...focusSessions]
-    setFocusSessions(next)
-    setLedger((prev) => [
-      { id: lid, title: label ? `Focus: ${label}` : 'Focus block', category: 'deep' as TaskCategory,
-        estimateMin: mins, actualMin: mins, when: day, space, weekKey: isoWeekKey(new Date(`${day}T12:00:00`)) },
-      ...prev,
-    ])
-    autoFrom(next, 0)
-  }
-
-  /* A task tied to a weekly goal moves that goal when it is finished, and moves
-     it back when it is reopened. Only a goal still running: last week's result
-     is history and a late tick must not rewrite it. */
-  const creditGoal = (t: Task | undefined, sign: 1 | -1) => {
-    if (!t?.goalId) return
-    const g = goals.find((x) => x.id === t.goalId)
-    if (!g || g.closed || g.habitId) return
-    growthSlice.bumpGoal(g.id, sign * (t.goalAmt ?? 1))
-  }
-
   const value: Store = {
     version: 3,
     tasks, habits, goals, projects, storageFull, ledger, plan, review, routines, ideas,
@@ -1600,39 +604,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     focusSessions, habitLog, routineLog, slips, stepLog, stepTicks, dayLog,
     view, setView, inView,
     twoLives, setTwoLives, reels, setReels, tunes, setTunes, reelFiles, setReelFile,
-    /* A finished block is recorded once, and everything that cares reads from
-       here: measured habits fill from it, and the ledger gets it so focus time
-       counts toward estimate accuracy instead of vanishing. */
-    logFocus: (minutes, label) => logFocusOn(todayKey(), minutes, label, new Date().toISOString()),
+    logFocus: ledgerSlice.logFocus,
     logFocusOn,
-    updateFocus: (id, patch) => {
-      const next = focusSessions.map((f) => (f.id === id
-        ? { ...f, ...(patch.minutes !== undefined ? { minutes: Math.max(1, Math.round(patch.minutes)) } : {}), ...(patch.label !== undefined ? { label: patch.label } : {}) }
-        : f))
-      setFocusSessions(next)
-      const f = next.find((x) => x.id === id)
-      // The ledger row is the same block seen from the other side; keep them equal.
-      if (f?.ledgerId) {
-        setLedger((prev) => prev.map((l) => (l.id === f.ledgerId
-          ? { ...l, estimateMin: f.minutes, actualMin: f.minutes, title: f.label ? `Focus: ${f.label}` : 'Focus block' }
-          : l)))
-      }
-      autoFrom(next, 0)
-    },
-    deleteFocus: (id) => {
-      const gone = focusSessions.find((f) => f.id === id)
-      const beforeF = focusSessions, beforeL = ledger, beforeH = habitLog
-      const keys = [rowKey('focusSessions', { id }), ...(gone?.ledgerId ? [rowKey('ledger', { id: gone.ledgerId })] : [])]
-      armUndo(gone ? `Removed a ${gone.minutes}m focus block` : 'Focus block removed', () => {
-        setFocusSessions(beforeF); setLedger(beforeL); setHabitLog(beforeH); digUp(...keys)
-      })
-      const next = focusSessions.filter((f) => f.id !== id)
-      setFocusSessions(next)
-      bury(...keys)
-      if (gone?.ledgerId) setLedger((prev) => prev.filter((l) => l.id !== gone.ledgerId))
-      autoFrom(next, 0)
-    },
-    syncAutoHabits: (extraMin = 0, label) => autoFrom(focusSessions, extraMin, label),
+    updateFocus: ledgerSlice.updateFocus,
+    deleteFocus: ledgerSlice.deleteFocus,
+    syncAutoHabits: ledgerSlice.syncAutoHabits,
     space, setSpace,
     page, setPage, dayKey, openDay,
     editing, setEditing,
@@ -1650,31 +626,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     updateTask: plannerSlice.updateTask,
 
-    logActual: (id, actualMin) => {
-      const t = tasks.find((x) => x.id === id)
-      if (t && !t.done) creditGoal(t, 1)
-      setTasks((prev) => prev.map((x) => (x.id === id
-        ? { ...x, done: true, doneAt: x.doneAt ?? new Date().toISOString(), actualMin, subtasks: x.subtasks?.map((sub) => ({ ...sub, done: true })) }
-        : x)))
-      if (t && t.actualMin === undefined) {
-        const lid = newId('l')
-        setLedger((prev) => [
-          { id: lid, title: t.title, category: t.category, estimateMin: t.estimateMin, actualMin, when: todayKey(), space: t.space, weekKey: isoWeekKey() },
-          ...prev,
-        ])
-        /* Real time on a task is real time whether or not the Pomodoro timer
-           ran for it. His report: he often works a task with Focus never
-           started, then logs the true minutes when he ticks it off, and
-           every counter that reads focusSessions -- Today, the measured
-           habits, Goals fed by one -- was blind to that time because this
-           path never wrote one. Sharing lid keeps the block attached to the
-           same ledger row logActual already writes, rather than a second,
-           orphaned one. */
-        const next = [{ id: newId('f'), day: todayKey(), minutes: actualMin, label: t.title, space: t.space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
-        setFocusSessions(next)
-        autoFrom(next, 0)
-      }
-    },
+    logActual: ledgerSlice.logActual,
 
     addTask: plannerSlice.addTask,
     addTaskWithSubtasks: plannerSlice.addTaskWithSubtasks,
@@ -1687,33 +639,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateSubtask: plannerSlice.updateSubtask,
     deleteSubtask: plannerSlice.deleteSubtask,
     toggleSubtask: plannerSlice.toggleSubtask,
-    /* Logging the LAST subtask closes the parent task and writes one ledger row
-       for the whole thing, so subtasked work reaches Review the same as flat work. */
-    logSubtaskActual: (taskId, subId, actualMin) => {
-      const parent = tasks.find((x) => x.id === taskId)
-      const subs = (parent?.subtasks ?? []).map((s) => (s.id === subId ? { ...s, done: true, actualMin } : s))
-      const allDone = subs.length > 0 && subs.every((s) => s.done)
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId && t.subtasks
-          ? { ...t, subtasks: subs, done: allDone || t.done, doneAt: allDone && !t.done ? new Date().toISOString() : t.doneAt }
-          : t)),
-      )
-      if (parent && allDone && !parent.done) {
-        creditGoal(parent, 1)
-        const est = subs.reduce((a, s) => a + s.estimateMin, 0)
-        const act = subs.reduce((a, s) => a + (s.actualMin ?? s.estimateMin), 0)
-        const lid = newId('l')
-        setLedger((prev) => [
-          { id: lid, title: parent.title, category: parent.category, estimateMin: est, actualMin: act, when: todayKey(), space: parent.space, weekKey: isoWeekKey() },
-          ...prev,
-        ])
-        /* Same as the flat-task path in logActual: the steps' real minutes
-           count as focus even when Focus was never started for them. */
-        const next = [{ id: newId('f'), day: todayKey(), minutes: act, label: parent.title, space: parent.space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
-        setFocusSessions(next)
-        autoFrom(next, 0)
-      }
-    },
+    logSubtaskActual: ledgerSlice.logSubtaskActual,
     deleteTask: plannerSlice.deleteTask,
     setSubtasks: plannerSlice.setSubtasks,
     estimateNow: async (taskId) => {
@@ -1825,31 +751,4 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   inboxRef.current = { add: value.addTask, done: value.logActual, tasks }
   return <Ctx.Provider value={value}>{children}<UndoToast /></Ctx.Provider>
-}
-
-export function useStore(): Store {
-  const s = useContext(Ctx)
-  if (!s) throw new Error('useStore outside provider')
-  return s
-}
-
-/* The bar that lets a delete be taken back. It sits above the tab bar on the
-   phone and clear of the Pomodoro badge on the desktop, and it goes away by
-   itself after ten seconds, which is long enough to notice and act. */
-function UndoToast() {
-  const { undoable, undoDelete, dismissUndo } = useStore()
-  useEffect(() => {
-    if (!undoable) return
-    const t = window.setTimeout(dismissUndo, 10000)
-    return () => window.clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [undoable?.id])
-  if (!undoable) return null
-  return (
-    <div className="undo-bar" role="status">
-      <span className="undo-what">{undoable.label}</span>
-      <button className="undo-do" onClick={undoDelete}>Undo</button>
-      <button className="undo-x" onClick={dismissUndo} aria-label="Dismiss">✕</button>
-    </div>
-  )
 }

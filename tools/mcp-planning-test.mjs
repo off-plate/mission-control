@@ -112,10 +112,10 @@ const db = stateDb(base())
 const srv = fakeServer(K, M.tools_planning.register, db)
 {
   const names = srv.names()
-  assert.deepEqual(names.sort(), ['day_capacity', 'focus_stats', 'get_calendar', 'log_focus', 'log_task_time', 'plan_day'])
+  assert.deepEqual(names.sort(), ['day_capacity', 'delete_focus_block', 'edit_focus_block', 'focus_stats', 'get_calendar', 'list_focus_blocks', 'log_focus', 'log_task_time', 'plan_day'])
   for (const n of names) { const c = srv.tools[n].cfg; assert.ok(c.title && c.description && c.inputSchema && c.annotations, `${n} fully described`) }
-  assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.readOnlyHint).sort(), ['day_capacity', 'focus_stats', 'get_calendar'])
-  assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.destructiveHint), [], 'nothing here deletes')
+  assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.readOnlyHint).sort(), ['day_capacity', 'focus_stats', 'get_calendar', 'list_focus_blocks'])
+  assert.deepEqual(names.filter((n) => srv.tools[n].cfg.annotations.destructiveHint), ['delete_focus_block'], 'only deleting a focus block is destructive')
   assert.match(srv.tools.log_task_time.cfg.description, /instead of complete_task/)
   assert.equal(srv.tools.get_calendar.cfg.annotations.openWorldHint, true)
 
@@ -401,6 +401,57 @@ const srv = fakeServer(K, M.tools_planning.register, db)
   const late = new Date('2026-11-07T23:30:00Z') // already 08 Nov in Prague, still 07 Nov on the server
   assert.deepEqual(P.calendarWindow({}, late), { from: '2026-11-08', to: '2026-11-08', days: 2 }, 'asks one day more so Prague\'s day is inside the feed\'s window')
   refuses(() => P.calendarWindow({ from: '2026-11-06' }, NOW), /only answers from today/)
+}
+
+
+/* ---- past focus blocks: list, edit, delete (src/store.tsx updateFocus / deleteFocus) ---- */
+{
+  const b = base()
+  b.focusSessions = [
+    { id: 'f-1', day: TODAY, minutes: 25, label: 'Write the report', space: 'work', ledgerId: 'l-1', at: '2026-11-07T09:30:00.000Z' },
+    { id: 'f-2', day: addDays(TODAY, -1), minutes: 50, space: 'personal', ledgerId: 'l-2', at: '2026-11-06T18:00:00.000Z' },
+    { id: 'f-old', day: addDays(TODAY, -30), minutes: 10, space: 'personal' },
+  ]
+  b.ledger = [
+    { id: 'l-1', title: 'Focus: Write the report', estimateMin: 25, actualMin: 25, when: TODAY, space: 'work' },
+    { id: 'l-2', title: 'Focus block', estimateMin: 50, actualMin: 50, when: addDays(TODAY, -1), space: 'personal' },
+  ]
+  const list = P.listFocusBlocks(b, {})
+  assert.deepEqual(list.items.map((x) => x.id), ['f-1', 'f-2'], 'last 7 days, newest first')
+  assert.equal(list.items[0].ended, '10:30', 'ended shown in Prague time')
+  assert.deepEqual(P.listFocusBlocks(b, { from: addDays(TODAY, -40), label: 'report' }).items.map((x) => x.id), ['f-1'])
+
+  const e = clone(b)
+  P.editFocusBlock(e, { id: 'f-2', minutes: 70, label: 'Deep work' })
+  assert.deepEqual([e.focusSessions[1].minutes, e.focusSessions[1].label], [70, 'Deep work'])
+  assert.deepEqual([e.ledger[1].estimateMin, e.ledger[1].actualMin, e.ledger[1].title], [70, 70, 'Focus: Deep work'], 'ledger row follows, as in the app')
+  P.editFocusBlock(e, { id: 'f-2', label: '' })
+  assert.equal(e.focusSessions[1].label, undefined); assert.equal(e.ledger[1].title, 'Focus block')
+  refuses(() => P.editFocusBlock(e, { id: 'nope', minutes: 5 }), /No focus block/)
+  refuses(() => P.editFocusBlock(e, { id: 'f-1' }), /Nothing to change/)
+  refuses(() => P.editFocusBlock(e, { id: 'f-1', minutes: 900 }), /1 to 480/)
+
+  const d = clone(b)
+  P.deleteFocusBlock(d, 'f-1')
+  assert.deepEqual(d.focusSessions.map((x) => x.id), ['f-2', 'f-old'])
+  assert.deepEqual(d.ledger.map((x) => x.id), ['l-2'], 'its ledger row goes too')
+  const keys = d.graveyard.map((g) => g.k)
+  assert.ok(keys.includes(M.appRowKey('focusSessions', { id: 'f-1' })) && keys.includes(M.appRowKey('ledger', { id: 'l-1' })), 'both buried with the app\'s own keys')
+  // A stale app copy that still has the block must not bring it back.
+  const merged = JSON.parse(M.mergeStates(JSON.stringify(b), JSON.stringify(d)))
+  assert.ok(!merged.focusSessions.some((x) => x.id === 'f-1'), 'deleted block stays deleted after the real merge')
+  assert.ok(!merged.ledger.some((x) => x.id === 'l-1'), 'its ledger row stays deleted after the real merge')
+
+  // through the server: the commit safety stop accepts one focus + one ledger row
+  const db = stateDb(clone(b))
+  const srv = fakeServer(K, M.tools_planning.register, db)
+  const r1 = await srv.call('delete_focus_block', { id: 'f-2' })
+  assert.ok(!r1.isError, r1.text)
+  const r2 = await srv.call('edit_focus_block', { id: 'f-1', minutes: 40 })
+  assert.ok(!r2.isError, r2.text)
+  const saved = db.tables.mc_state[0].data
+  assert.deepEqual(saved.focusSessions.map((x) => [x.id, x.minutes]), [['f-1', 40], ['f-old', 10]])
+  assert.equal(srv.tools.delete_focus_block.cfg.annotations.destructiveHint, true)
 }
 
 console.log(`MCP planning: all checks passed (${K.zodReal ? 'schemas validated with zod' : 'schemas NOT validated'}).`)

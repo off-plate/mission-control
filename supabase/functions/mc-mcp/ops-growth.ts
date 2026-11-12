@@ -360,7 +360,7 @@ function syncRoutineFromHabits(b: Blob, routineId: string): void {
 /* ============================ habits: ticking ================================= */
 
 /** growth.ts markDayOn: tick or untick ONE DATE of one habit, in the durable log and the week cache. */
-function markDayOn(b: Blob, habitId: string, day: string, value: boolean): void {
+export function markDayOn(b: Blob, habitId: string, day: string, value: boolean): void {
   const log = arr(b, 'habitLog')
   const gone = log.filter((t) => t.habitId === habitId && t.day === day)
   const without = log.filter((t) => !(t.habitId === habitId && t.day === day))

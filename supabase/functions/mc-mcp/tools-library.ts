@@ -39,7 +39,7 @@ export function register(r: Reg): void {
   r.tool('delete_prompt', { title: 'Delete a saved prompt', description: 'Delete a saved prompt for good. Confirm first unless asked.', inputSchema: z.object(ref), annotations: ann.D }, (i) => write((b) => L.deletePrompt(b, i)))
 
   /* ---------- gym goals ---------- */
-  r.tool('list_gym_goals', { title: 'List gym goals', description: 'Gym targets with unit, metric, the linked Hevy exercise and (manual goals) the number he keeps by hand. Live progress from Hevy is computed inside the app and is not available here.', inputSchema: z.object({}), annotations: ann.RO }, () => read(L.listGymGoals))
+  r.tool('list_gym_goals', { title: 'List gym goals', description: 'Gym targets with unit, metric, the linked Hevy exercise and (manual goals) the number he keeps by hand. For LIVE progress (current value and % from his real Hevy sets) use get_gym.', inputSchema: z.object({}), annotations: ann.RO }, () => read(L.listGymGoals))
   r.tool('add_gym_goal', {
     title: 'Add a gym goal', description: 'New gym target. metric: e1rm (best estimated 1RM ever of a lift) and repTotal (rep total of one session) read a Hevy exercise, so exercise is required: the EXACT Hevy title, e.g. "Bench Press (Barbell)" (it cannot be verified here). sessions counts training days. manual is a number he keeps himself (bodyweight). Default metric: e1rm if an exercise is given, else manual. lower_is_better for bodyweight-type goals.',
     inputSchema: z.object({ name: z.string(), goal: z.number().min(0).max(1e6), unit: z.string().max(20), exercise: z.string().optional(), metric: z.enum(L.GYM_METRICS as [string, ...string[]]).optional(), lower_is_better: z.boolean().optional() }), annotations: ann.W,

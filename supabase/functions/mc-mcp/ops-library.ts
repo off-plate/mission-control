@@ -315,7 +315,7 @@ export function deleteGymGoal(b: Blob, ref: Ref): Out {
 
 export function listGymGoals(b: Blob): Row {
   return {
-    note: 'Progress is computed live from Hevy inside the app; here you see the target, the unit and (for manual goals) the number he keeps by hand.',
+    note: 'Targets only. get_gym returns each goal with its live current value and % from Hevy.',
     goals: arr(b, 'gymGoals').map((g) => ({ id: g.id, name: g.name, goal: g.goal, unit: g.unit, metric: g.metric, ...(g.exerciseName ? { exercise: g.exerciseName } : {}), ...(g.current != null ? { current: g.current } : {}), ...(g.lowerIsBetter ? { lower_is_better: true } : {}), ...(g.note ? { note: g.note } : {}) })),
   }
 }

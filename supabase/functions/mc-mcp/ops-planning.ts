@@ -16,7 +16,7 @@
    written here gets a fresh newId and rows are only ever ADDED, never rewritten. */
 
 import {
-  McError, arr, dateKey, ensure, findTask, isDate, isTime, newId, pick, slotForTime, SLOTS, updateTask,
+  McError, arr, bury, dateKey, ensure, findTask, isDate, isTime, newId, pick, rowKey, slotForTime, SLOTS, updateTask,
   type Blob, type Ref, type Row, type Slot,
 } from './ops.ts'
 
@@ -237,12 +237,12 @@ export function dayCapacity(b: Blob, date?: string, extraBusy: Busy[] = []): Row
 /* ============================== log_task_time ================================ */
 
 /** src/store.tsx creditGoal + src/store/growth.ts bumpGoal: finishing a task tied to a running weekly goal moves it. */
-function creditGoal(b: Blob, t: Row): string | null {
+function creditGoal(b: Blob, t: Row, today = dateKey()): string | null {
   if (!t.goalId) return null
   const g = arr(b, 'goals').find((x) => x.id === t.goalId)
   if (!g || g.closed || g.habitId) return null
   if (typeof g.current !== 'number' || typeof g.target !== 'number') throw new McError(`"${t.title}" feeds the goal "${g.name}", which has no numeric progress this connector can move. Finish it in the app.`)
-  g.current = Math.max(0, Math.min(g.target, g.current + (t.goalAmt ?? 1))); g.touchedAt = dateKey()
+  g.current = Math.max(0, Math.min(g.target, g.current + (t.goalAmt ?? 1))); g.touchedAt = today
   return `the goal "${g.name}" moved to ${g.current}/${g.target}`
 }
 
@@ -270,7 +270,7 @@ export function logTaskTime(b: Blob, ref: Ref, minutes: number, step?: Ref, now 
     if (allDone && !t.done) { t.done = true; t.doneAt = stamp }
     say.push(`Logged ${fmtDuration(mins)} on the step "${sub.title}"`)
     if (allDone && !wasDone) {
-      const goal = creditGoal(b, t)
+      const goal = creditGoal(b, t, today)
       const est = subs.reduce((a, s) => a + (Number(s.estimateMin) || 0), 0)
       const act = subs.reduce((a, s) => a + (s.actualMin ?? s.estimateMin ?? 0), 0)
       const lid = newId('l')
@@ -281,7 +281,7 @@ export function logTaskTime(b: Blob, ref: Ref, minutes: number, step?: Ref, now 
     return { id: t.id, text: `${say.join('; ')}.` }
   }
 
-  if (!t.done) { const goal = creditGoal(b, t); if (goal) say.push(goal) }
+  if (!t.done) { const goal = creditGoal(b, t, today); if (goal) say.push(goal) }
   const first = t.actualMin === undefined
   t.done = true
   t.doneAt = t.doneAt ?? stamp
@@ -419,4 +419,76 @@ export function shapeCalendar(raw: unknown, ask: { from: string; to: string }, o
     events,
     note: 'Meetings he declined are already left out by the feed. Times are Prague time.',
   }
+}
+
+/* ============================== past focus blocks ============================ */
+
+export interface ListFocusInput { from?: string; to?: string; space?: 'personal' | 'work'; label?: string; limit?: number }
+
+const pragueClock = (iso: unknown): string | undefined => {
+  if (typeof iso !== 'string' || Number.isNaN(Date.parse(iso))) return undefined
+  const z = zoned(new Date(iso))
+  return hhmm(z.hour * 60 + z.minute)
+}
+
+/** Every finished focus block in a range, newest first, with the id edit/delete need. src/focus.tsx lists the same rows. */
+export function listFocusBlocks(b: Blob, i: ListFocusInput): Row {
+  const today = dateKey()
+  const to = i.to ?? today
+  if (!isDate(to)) throw new McError(`to must be YYYY-MM-DD, got "${i.to}".`)
+  const d = new Date(`${to}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 6)
+  const from = i.from ?? d.toISOString().slice(0, 10)
+  if (!isDate(from)) throw new McError(`from must be YYYY-MM-DD, got "${i.from}".`)
+  if (from > to) throw new McError('from is after to.')
+  const want = i.label?.trim().toLowerCase()
+  const rows = arr(b, 'focusSessions')
+    .filter((f) => f.day >= from && f.day <= to && (!i.space || f.space === i.space) && (!want || String(f.label ?? '').toLowerCase().includes(want)))
+    .sort((a, c) => (a.day === c.day ? String(c.at ?? '').localeCompare(String(a.at ?? '')) : String(c.day).localeCompare(String(a.day))))
+  const limit = Math.min(Math.max(1, i.limit ?? 100), 300)
+  const total = rows.reduce((s, f) => s + (Number(f.minutes) || 0), 0)
+  return {
+    from, to, blocks: rows.length, totalMin: total, total: fmtDuration(total),
+    ...(rows.length > limit ? { shown: limit, note: `Showing the newest ${limit} of ${rows.length}. Narrow the range to see the rest.` } : {}),
+    items: rows.slice(0, limit).map((f) => ({
+      id: f.id, day: f.day, minutes: f.minutes, label: f.label ?? null, space: f.space ?? null,
+      ...(pragueClock(f.at) ? { ended: pragueClock(f.at) } : {}),
+    })),
+  }
+}
+
+export interface EditFocusInput { id: string; minutes?: number; label?: string }
+
+/** src/store.tsx updateFocus: minutes and label, and the block's ledger row kept equal to it. */
+export function editFocusBlock(b: Blob, i: EditFocusInput): { id: string; text: string } {
+  const f = arr(b, 'focusSessions').find((x) => x.id === i.id)
+  if (!f) throw new McError(`No focus block has the id "${i.id}". Use list_focus_blocks to get a real id.`)
+  if (i.minutes === undefined && i.label === undefined) throw new McError('Nothing to change. Pass minutes, label, or both.')
+  const was = { minutes: f.minutes, label: f.label }
+  if (i.minutes !== undefined) f.minutes = Math.max(1, Math.round(checkMinutes(i.minutes)))
+  if (i.label !== undefined) {
+    const l = i.label.trim().slice(0, 200)
+    if (l) f.label = l; else delete f.label
+  }
+  if (f.ledgerId) {
+    const l = arr(b, 'ledger').find((x) => x.id === f.ledgerId)
+    if (l) { l.estimateMin = f.minutes; l.actualMin = f.minutes; l.title = f.label ? `Focus: ${f.label}` : 'Focus block' }
+  }
+  const said: string[] = []
+  if (was.minutes !== f.minutes) said.push(`${fmtDuration(was.minutes)} to ${fmtDuration(f.minutes)}`)
+  if ((was.label ?? '') !== (f.label ?? '')) said.push(`label "${was.label ?? '(none)'}" to "${f.label ?? '(none)'}"`)
+  return { id: f.id, text: said.length ? `Focus block on ${f.day} changed: ${said.join(', ')}. Habits fed by focus follow on the app's next open.` : `Focus block on ${f.day} already had those values; nothing changed.` }
+}
+
+/** src/store.tsx deleteFocus: the block and its ledger row go, both buried so another device cannot bring them back. */
+export function deleteFocusBlock(b: Blob, id: string): { id: string; text: string } {
+  const f = arr(b, 'focusSessions').find((x) => x.id === id)
+  if (!f) throw new McError(`No focus block has the id "${id}". Use list_focus_blocks to get a real id.`)
+  b.focusSessions = arr(b, 'focusSessions').filter((x) => x.id !== id)
+  const keys = [rowKey('focusSessions', { id })]
+  if (f.ledgerId) {
+    b.ledger = arr(b, 'ledger').filter((x) => x.id !== f.ledgerId)
+    keys.push(rowKey('ledger', { id: f.ledgerId }))
+  }
+  bury(b, ...keys)
+  return { id, text: `Removed the ${fmtDuration(f.minutes)} focus block${f.label ? ` "${f.label}"` : ''} from ${f.day}. A habit it had earned is taken back on the app's next open.` }
 }

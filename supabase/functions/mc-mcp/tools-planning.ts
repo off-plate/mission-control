@@ -33,7 +33,7 @@ export function register(r: Reg): void {
 
   r.tool('log_task_time', {
     title: 'Log how long a task took',
-    description: 'Finish a task AND record the real time, exactly as the app does when he ticks it off with a number: marks it done, stores the minutes, writes the ledger row (estimate vs actual, feeds estimate accuracy) and a focus block for those minutes, and moves a weekly goal the task feeds. Pass minutes (1-480). For a task with steps, pass step (id or title of one step) to log that step only; logging the LAST step finishes the task and writes one ledger row for the whole; without step, all steps are ticked done. If time was already logged on the task only the number changes (no second row). Use this instead of complete_task when he told you how long it took. Not supported: a running focus timer (client-side).',
+    description: 'Finish a task AND record the real time, exactly as the app does when he ticks it off with a number: marks it done, stores the minutes, writes the ledger row (estimate vs actual, feeds estimate accuracy) and a focus block for those minutes, and moves a weekly goal the task feeds. Pass minutes (1-480). For a task with steps, pass step (id or title of one step) to log that step only; logging the LAST step finishes the task and writes one ledger row for the whole; without step, all steps are ticked done. If time was already logged on the task only the number changes (no second row). Use this instead of complete_task when he told you how long it took. For a live timer use start_focus / stop_focus.',
     inputSchema: z.object({
       ...ref, minutes: z.number().int().min(1).max(480),
       step: z.object(ref).optional().describe('One step of the task (id or part of its title)'),
@@ -43,7 +43,7 @@ export function register(r: Reg): void {
 
   r.tool('log_focus', {
     title: 'Log focus he already did',
-    description: 'Record a focus block that already happened: minutes (1-480), optional label, date (default today, not in the future), at (HH:MM Prague time when it ENDED; default now). Writes the focus session and its ledger row like the app. If the label is exactly the title of a task (or of a step) the block is filed under that task\'s space; otherwise pass space (personal or work), because the app uses the space he is viewing, which this connector cannot see. Refuses the same block logged twice within two minutes. Not supported: starting or stopping the live timer (it runs in the app), editing or deleting a block.',
+    description: 'Record a focus block that already happened: minutes (1-480), optional label, date (default today, not in the future), at (HH:MM Prague time when it ENDED; default now). Writes the focus session and its ledger row like the app. If the label is exactly the title of a task (or of a step) the block is filed under that task\'s space; otherwise pass space (personal or work), because the app uses the space he is viewing, which this connector cannot see. Refuses the same block logged twice within two minutes. To start the live timer use start_focus; to change or remove a past block use list_focus_blocks, then edit_focus_block or delete_focus_block.',
     inputSchema: z.object({
       minutes: z.number().int().min(1).max(480), label: z.string().max(200).optional(),
       date: date.optional(), at: time.optional(), space: s.space.optional(),
@@ -57,6 +57,27 @@ export function register(r: Reg): void {
     inputSchema: z.object({ from: date.optional(), to: date.optional(), by: z.enum(['day', 'week']).optional(), space: s.space.optional() }),
     annotations: ann.RO,
   }, (i) => read((b) => p.focusStats(b, i)))
+
+  r.tool('list_focus_blocks', {
+    title: 'List past focus blocks',
+    description: 'Every finished focus block from `from` to `to` (default the last 7 days), newest first: id, day, minutes, label, space, and the Prague time it ended. Optional space filter and label (part of the label). Use the ids with edit_focus_block or delete_focus_block. A timer running right now is not a block yet (see get_focus_timer).',
+    inputSchema: z.object({ from: date.optional(), to: date.optional(), space: s.space.optional(), label: z.string().max(200).optional(), limit: z.number().int().min(1).max(300).optional() }),
+    annotations: ann.RO,
+  }, (i) => read((b) => p.listFocusBlocks(b, i)))
+
+  r.tool('edit_focus_block', {
+    title: 'Edit a past focus block',
+    description: 'Change a finished focus block exactly as the app\'s edit does: minutes (1-480) and/or label (empty string removes the label). Its ledger row follows, so estimate accuracy and weekly totals stay right; habits fed by focus minutes re-check themselves on the app\'s next open. The day and space cannot be changed (the app cannot either): delete the block and log_focus a new one instead. Get the id from list_focus_blocks.',
+    inputSchema: z.object({ id: z.string(), minutes: z.number().int().min(1).max(480).optional(), label: z.string().max(200).optional() }),
+    annotations: ann.WI,
+  }, (i) => write((b) => p.editFocusBlock(b, i)))
+
+  r.tool('delete_focus_block', {
+    title: 'Delete a past focus block',
+    description: 'Remove one finished focus block and its ledger row for good, as the app\'s delete does; a habit it earned is taken back on the app\'s next open. Confirm with him first unless he asked. Get the id from list_focus_blocks.',
+    inputSchema: z.object({ id: z.string() }),
+    annotations: ann.D,
+  }, ({ id }) => write((b) => p.deleteFocusBlock(b, id)))
 
   r.tool('get_calendar', {
     title: 'Meetings from the work calendar',

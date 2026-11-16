@@ -1,5 +1,5 @@
 node_modules/
-notes/
+/notes/
 .DS_Store
 *.local
 .qa-shots/

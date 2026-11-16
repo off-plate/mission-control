@@ -23,7 +23,7 @@ const hOf = (d: number) => Math.max(46, Math.min(240, Math.round(d * 0.8)))
    read dataTransfer, and the length of the thing decides where it fits. */
 let dragging: string | null = null
 
-export function PlanLine({ day, all, isToday, hueStyle, tag, estimate, check, log, focus, steps, stepsToggle, flashId, onPlace, onAdd }: {
+export function PlanLine({ day, all, isToday, hueStyle, tag, estimate, check, log, focus, steps, stepsToggle, flashId, onPlace, onAdd, onEdit, onBack }: {
   day: Task[]
   all: Task[]
   isToday: boolean
@@ -39,6 +39,8 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, estimate, check, lo
   flashId: string | null
   onPlace: (id: string, writes: { id: string; at: string }[]) => void
   onAdd: (title: string, at: string) => void
+  onEdit: (t: Task) => void
+  onBack: (t: Task) => void
 }) {
   const [now, setNow] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() })
   useEffect(() => {
@@ -195,6 +197,12 @@ export function PlanLine({ day, all, isToday, hueStyle, tag, estimate, check, lo
                     aria-label={`Focus on ${t.title}`} title={isEstimated(t) ? `Focus ${fmtDuration(taskMinutes(t))} on this` : 'Estimating...'}>
                     <Icon.Play size={14} /> Focus
                   </button>
+                )}
+                {!t.done && (
+                  <>
+                    <button className="pl-est" aria-label={`Edit ${t.title}`} title="Edit" onClick={() => onEdit(t)}><Icon.Edit size={16} /></button>
+                    <button className="pl-est" aria-label={`Back to the list: ${t.title}`} title="Back to the list" onClick={() => onBack(t)}><Icon.SkipBack size={16} /></button>
+                  </>
                 )}
                 {estimate(t)}
               </div>

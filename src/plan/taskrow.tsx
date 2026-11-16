@@ -111,7 +111,7 @@ export function SubtaskRow({ taskId, sub }: { taskId: string; sub: SubTask }) {
    is his, generated or typed, so every row can be corrected without a detour
    through delete-and-retype. */
 export function EditTaskSheet({ task, onClose }: { task: Task; onClose: () => void }) {
-  const { updateTask, projects, setTaskProject } = useStore()
+  const { updateTask, projects, setTaskProject, deleteTask } = useStore()
   /* The words and the hashtag, nothing else. The minutes already have a home
      of their own, on the estimate chip and on each step, and a second door to
      the same number is how two numbers disagree. The tag is written into the
@@ -132,6 +132,7 @@ export function EditTaskSheet({ task, onClose }: { task: Task; onClose: () => vo
       <label className="field-label" htmlFor="et-title">What is it?</label>
       <TagField id="et-title" label="What is it?" value={title} onChange={setTitle} onSubmit={save} projects={choices} createSpace={task.space} autoFocus />
       <div className="sheet-actions">
+        <button className="btn btn-danger" style={{ marginRight: "auto" }} onClick={() => { deleteTask(task.id); onClose() }}>Delete</button>
         <button className="btn btn-quiet" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!title.trim()} onClick={save}>Save changes</button>
       </div>

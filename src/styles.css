@@ -12986,7 +12986,7 @@ button.pf-phase-head:focus-visible { outline: 2px solid var(--accent); outline-o
 .pl-task.is-flex .pl-bar { background: color-mix(in srgb, var(--h, var(--info)) 50%, var(--surface)); }
 .pl-task.is-live .pl-bar { background: linear-gradient(var(--h, var(--info)) var(--p), color-mix(in srgb, var(--h, var(--info)) 28%, var(--surface)) var(--p)); }
 .pl-task.is-done .pl-bar { opacity: 0.35; }
-.pl-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; margin: 2px 0; padding: 8px 8px 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--h, var(--info)) 14%, var(--surface)); cursor: grab; }
+.pl-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 6px; margin: 2px 0; padding: 8px 8px 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--h, var(--info)) 14%, var(--surface)); cursor: grab; }
 .pl-task[draggable="false"] .pl-card { cursor: default; }
 .pl-task.is-done .pl-card { opacity: 0.6; }
 .pl-task.is-done .pl-txt b { text-decoration: line-through; }

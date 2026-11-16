@@ -430,6 +430,7 @@ export function PlanPage() {
     if (!t || t.list === 'backlog') return
     moveTaskList(id, 'backlog')
     assignSlot(id, undefined)
+    setTaskAt(id, undefined)  // a task placed on the Line keeps its clock time otherwise
   }
 
 
@@ -858,6 +859,8 @@ export function PlanPage() {
             focus={(t) => () => startFocus(taskMinutes(t), t.title)}
             steps={(t) => (expanded.has(t.id) ? subList(t) : null)}
             stepsToggle={stepsToggle}
+            onEdit={(t) => setEditingTask(t)}
+            onBack={(t) => dropToList(t.id)}
             flashId={flashId}
             onPlace={(id, writes) => {
               const t = tasks.find((x) => x.id === id)

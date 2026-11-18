@@ -263,6 +263,28 @@ export function reopenTask(b: Blob, ref: Ref): { id: string; text: string } {
   return { id: t.id, text: `Reopened "${t.title}".` }
 }
 
+/* One step of a task, done or not, the app's toggleSubtask (src/store/planner.ts) as an
+   explicit set so a repeated call cannot flip it back. Un-ticking clears its logged minutes,
+   as the app does. `step` is the 1-based position shown in get_day, or part of its title. */
+export function tickStep(b: Blob, ref: Ref, step: number | string, done: boolean): { id: string; text: string } {
+  const t = findTask(b, ref)
+  const subs: Row[] = Array.isArray(t.subtasks) ? t.subtasks : []
+  if (!subs.length) throw new McError(`"${t.title}" has no steps.`)
+  let k = -1
+  if (typeof step === 'number') k = step - 1
+  else {
+    const hits = subs.map((s, i) => [s, i] as const).filter(([s]) => fold(String(s.title)).includes(fold(step)))
+    if (hits.length > 1) throw new McError(`"${step}" matches ${hits.length} steps of "${t.title}": ${hits.map(([s]) => s.title).join(', ')}.`)
+    k = hits.length ? hits[0][1] : -1
+  }
+  if (k < 0 || k >= subs.length) throw new McError(`"${t.title}" has ${subs.length} steps; there is no step ${typeof step === 'number' ? step : `"${step}"`}.`)
+  const s = subs[k]
+  if (!!s.done === done) return { id: t.id, text: `Step "${s.title}" was already ${done ? 'done' : 'not done'}.` }
+  t.subtasks = subs.map((x, i) => (i !== k ? x : done ? { ...x, done: true } : (() => { const { actualMin: _a, ...rest } = x; return { ...rest, done: false } })()))
+  const left = t.subtasks.filter((x: Row) => !x.done).length
+  return { id: t.id, text: `${done ? 'Ticked' : 'Unticked'} step "${s.title}" of "${t.title}" (${left} of ${subs.length} left).` }
+}
+
 export function deleteTask(b: Blob, ref: Ref): { id: string; text: string } {
   const t = findTask(b, ref)
   b.tasks = arr(b, 'tasks').filter((x) => x.id !== t.id)

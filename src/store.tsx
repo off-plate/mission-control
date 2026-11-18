@@ -1,7 +1,7 @@
 import { haptic } from './haptic'
 import { flushSync } from 'react-dom'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, loadRemoteStamp, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
 import { estimateTask } from './ai'
 import { estimateFor } from './estimate'
@@ -88,6 +88,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [lastRollDay] = useState<string | undefined>(persisted?.lastRollDay)
   const remoteSaveTimer = useRef<number | undefined>(undefined)
   const latestJson = useRef<string>('')
+  /* Last full-pull fingerprint: server updated_at and local json at that moment. */
+  const lastPullStamp = useRef<string | null>(null)
+  const lastPullMine = useRef<string>('')
   const localSaveTimer = useRef<number | undefined>(undefined)
   const pendingSave = useRef<(() => void) | null>(null)
   const firstSave = useRef(true)
@@ -508,10 +511,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!SUPABASE_ENABLED) return
     let stop = false
-    const pull = async () => {
+    const pull = async (force = false) => {
       if (isReadOnly() || document.visibilityState !== 'visible') return
+      /* Cheap check first. If the server row is unchanged since the last full
+         read, local has not changed since then either, and nothing is waiting
+         in the outbox, a full pull would find nothing: skip the ~465 KB
+         download. Any doubt (no stamp, local edits, pending push, a manual
+         refresh) falls through to the full path below, exactly as before. */
+      const stamp = await loadRemoteStamp()
+      if (stop) return
+      flushLocal()
+      if (!force && stamp && stamp === lastPullStamp.current && latestJson.current === lastPullMine.current
+          && outbox.status().phase === 'synced') {
+        void pullOutreach()
+        return
+      }
       const remote = await loadRemoteState()
       if (stop) return
+      lastPullStamp.current = stamp
+      lastPullMine.current = latestJson.current
       if (remote) applyExternalRef.current(remote)
       void pullOutreach()
       /* And the other direction. Without this, work done offline never leaves the
@@ -527,7 +545,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     const onWake = () => { void pull() }
     /* Pull to refresh on Today: the same pull, with the orb saving meanwhile. */
-    const onRefresh = () => { void outbox.during(pull()) }
+    const onRefresh = () => { void outbox.during(pull(true)) }
     document.addEventListener('visibilitychange', onWake)
     window.addEventListener('focus', onWake)
     window.addEventListener('mc:refresh', onRefresh)

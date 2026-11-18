@@ -45,6 +45,7 @@ export function register(r: Reg): void {
     return fed ? { ...res, text: `${res.text} Goal: ${fed}.` } : res
   }))
   r.tool('set_task_steps', { title: "Set a task's steps", description: "Replace a task's subtasks. An empty list removes them.", inputSchema: z.object({ ...ref, steps }), annotations: ann.WI }, ({ id, title, steps: st }) => write((b) => ops.setSteps(b, { id, title }, st)))
+  r.tool('tick_step', { title: 'Tick a step', description: "Mark one step (subtask) of a task done, or not done with done: false. step = its number as listed in get_day (1 = first) or part of its title. Unticking clears the minutes logged on it, as the app does. Does not finish the task itself; use complete_task for that.", inputSchema: z.object({ ...ref, step: z.union([z.number().int().min(1), z.string().min(1)]), done: z.boolean().optional() }), annotations: ann.WI }, ({ id, title, step, done }) => write((b) => ops.tickStep(b, { id, title }, step, done !== false)))
   r.tool('delete_task', { title: 'Delete a task', description: 'Delete a task for good. Confirm with the user first unless they asked for it.', inputSchema: z.object(ref), annotations: ann.D }, (i) => write((b) => ops.deleteTask(b, i)))
 
   /* ---------------- projects ---------------- */

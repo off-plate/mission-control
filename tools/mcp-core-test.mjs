@@ -14,7 +14,7 @@ const srv = fakeServer(K, M.tools_core.register, db)
 /* The surface: every tool has a title, a description, an input schema and annotations. */
 const names = srv.names()
 assert.equal(names.length, new Set(names).size)
-assert.equal(names.length, 21, `21 tools, got ${names.length}: ${names}`)
+assert.equal(names.length, 22, `22 tools, got ${names.length}: ${names}`)
 for (const n of names) {
   const c = srv.tools[n].cfg
   assert.ok(c.title && c.description && c.inputSchema && c.annotations, `${n} is fully described`)
@@ -94,5 +94,22 @@ const del = await srv.call('delete_note', { id: nid })
 assert.equal(del.isError, false); assert.equal(notes().length, n0 + 1)
 assert.ok(!notes().some((n) => n.id === nid))
 assert.equal(srv.tools.edit_note_text.cfg.annotations.destructiveHint, false, 'an in-place edit does not ask for approval')
+
+/* tick_step: one step at a time, an explicit set, unticking clears its minutes (app's toggleSubtask). */
+await srv.call('set_task_steps', { title: 'From the connector', steps: [{ title: 'Draft' }, { title: 'Review it' }, { title: 'Send' }] })
+const task = () => db.tables.mc_state[0].data.tasks.find((t) => t.title === 'From the connector')
+const ts1 = await srv.call('tick_step', { title: 'From the connector', step: 2 })
+assert.equal(ts1.isError, false, ts1.text); assert.match(ts1.text, /Ticked step "Review it".*2 of 3 left/)
+assert.deepEqual(task().subtasks.map((x) => x.done), [false, true, false])
+const ts2 = await srv.call('tick_step', { title: 'From the connector', step: 2 })
+assert.match(ts2.text, /already done/); assert.deepEqual(task().subtasks.map((x) => x.done), [false, true, false], 'a repeat does not flip it back')
+task().subtasks[1].actualMin = 12
+await srv.call('tick_step', { title: 'From the connector', step: 'review', done: false })
+assert.equal(task().subtasks[1].done, false); assert.equal(task().subtasks[1].actualMin, undefined, 'unticking clears its minutes')
+assert.equal(task().done, false, 'ticking steps never finishes the task')
+const ts3 = await srv.call('tick_step', { title: 'From the connector', step: 9 })
+assert.equal(ts3.isError, true); assert.match(ts3.text, /has 3 steps/)
+const ts4 = await srv.call('tick_step', { title: 'From the connector', step: 'e' })
+assert.equal(ts4.isError, true); assert.match(ts4.text, /matches \d steps/)
 
 console.log(`MCP core registry: all checks passed (${K.zodReal ? 'schemas validated with zod' : 'schemas NOT validated'}).`)

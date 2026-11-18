@@ -14,7 +14,7 @@ const srv = fakeServer(K, M.tools_core.register, db)
 /* The surface: every tool has a title, a description, an input schema and annotations. */
 const names = srv.names()
 assert.equal(names.length, new Set(names).size)
-assert.equal(names.length, 22, `22 tools, got ${names.length}: ${names}`)
+assert.equal(names.length, 24, `24 tools, got ${names.length}: ${names}`)
 for (const n of names) {
   const c = srv.tools[n].cfg
   assert.ok(c.title && c.description && c.inputSchema && c.annotations, `${n} is fully described`)
@@ -111,5 +111,21 @@ const ts3 = await srv.call('tick_step', { title: 'From the connector', step: 9 }
 assert.equal(ts3.isError, true); assert.match(ts3.text, /has 3 steps/)
 const ts4 = await srv.call('tick_step', { title: 'From the connector', step: 'e' })
 assert.equal(ts4.isError, true); assert.match(ts4.text, /matches \d steps/)
+
+/* add_step / rename_step: the app's addSubtask / updateSubtask. */
+const stepsBefore = task().subtasks.length
+const as1 = await srv.call('add_step', { title: 'From the connector', step_title: 'Follow up', minutes: 10 })
+assert.equal(as1.isError, false, as1.text); assert.equal(task().subtasks.length, stepsBefore + 1)
+assert.equal(task().subtasks.at(-1).title, 'Follow up'); assert.equal(task().subtasks.at(-1).estimateMin, 10); assert.equal(task().subtasks.at(-1).done, false)
+assert.equal(task().estimateMin, task().subtasks.reduce((a, x) => a + x.estimateMin, 0), 'estimate is the sum of steps')
+const rs1 = await srv.call('rename_step', { title: 'From the connector', step: 1, new_title: 'Write the draft' })
+assert.equal(rs1.isError, false, rs1.text); assert.equal(task().subtasks[0].title, 'Write the draft')
+assert.equal((await srv.call('rename_step', { title: 'From the connector', step: 99, new_title: 'x' })).isError, true)
+assert.equal((await srv.call('add_step', { title: 'From the connector', step_title: '   ' })).isError, true)
+/* the first step of an estimated task with no steps inherits its estimate */
+await srv.call('add_task', { title: 'Estimated alone', minutes: 40 })
+await srv.call('add_step', { title: 'Estimated alone', step_title: 'Only step' })
+const ea = db.tables.mc_state[0].data.tasks.find((t) => t.title === 'Estimated alone')
+assert.equal(ea.subtasks[0].estimateMin, 40); assert.equal(ea.estimateMin, 40)
 
 console.log(`MCP core registry: all checks passed (${K.zodReal ? 'schemas validated with zod' : 'schemas NOT validated'}).`)

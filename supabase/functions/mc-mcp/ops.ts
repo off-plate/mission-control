@@ -285,6 +285,33 @@ export function tickStep(b: Blob, ref: Ref, step: number | string, done: boolean
   return { id: t.id, text: `${done ? 'Ticked' : 'Unticked'} step "${s.title}" of "${t.title}" (${left} of ${subs.length} left).` }
 }
 
+/* A step he adds himself: the app's addSubtask (src/store/planner.ts). The first step of a task that
+   already has an estimate inherits it; after that the task is the sum of its steps (default 15 min). */
+export function addStep(b: Blob, ref: Ref, title: string, minutes?: number): { id: string; text: string } {
+  const t = findTask(b, ref)
+  const name = String(title ?? '').trim()
+  if (!name) throw new McError('A step needs a title.')
+  const subs: Row[] = Array.isArray(t.subtasks) ? t.subtasks : []
+  const first = !subs.length
+  const mins = Math.max(1, Math.round(minutes ?? (first && t.estimated && t.estimateMin > 0 ? t.estimateMin : 15)))
+  t.subtasks = [...subs, { id: `${t.id}s${Date.now().toString(36)}${subs.length.toString(36)}`, title: name, estimateMin: mins, done: false }]
+  t.estimateMin = t.subtasks.reduce((a: number, x: Row) => a + (Number(x.estimateMin) || 0), 0); t.estimated = true
+  return { id: t.id, text: `Added step "${name}" to "${t.title}" (${t.subtasks.length} steps now).` }
+}
+
+/* Rename a step (and optionally re-estimate it): the app's updateSubtask. */
+export function renameStep(b: Blob, ref: Ref, step: number, title: string): { id: string; text: string } {
+  const t = findTask(b, ref)
+  const subs: Row[] = Array.isArray(t.subtasks) ? t.subtasks : []
+  const name = String(title ?? '').trim()
+  if (!name) throw new McError('A step needs a title.')
+  if (step < 1 || step > subs.length) throw new McError(`"${t.title}" has ${subs.length} steps; there is no step ${step}.`)
+  const old = subs[step - 1].title
+  t.subtasks = subs.map((x, i) => (i === step - 1 ? { ...x, title: name } : x))
+  t.estimateMin = t.subtasks.reduce((a: number, x: Row) => a + (Number(x.estimateMin) || 0), 0); t.estimated = true
+  return { id: t.id, text: `Renamed step "${old}" to "${name}".` }
+}
+
 export function deleteTask(b: Blob, ref: Ref): { id: string; text: string } {
   const t = findTask(b, ref)
   b.tasks = arr(b, 'tasks').filter((x) => x.id !== t.id)

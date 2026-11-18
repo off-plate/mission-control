@@ -201,6 +201,24 @@ export async function loadRemoteHead(): Promise<Head> {
   }
 }
 
+/** Just the row's updated_at (a few bytes), so a poll can tell "unchanged"
+ *  without downloading the whole ~465 KB state. null = unknown, so the caller
+ *  must fall back to the full read. Added 2026-11-07, shipped 2026-11-18: the
+ *  60 s pull was ~600 MB a day of egress. */
+export async function loadRemoteStamp(): Promise<string | null> {
+  const c = db()
+  if (!c) return null
+  const me = await currentAccount()
+  if (!me) return null
+  try {
+    const { data, error } = await c.from(TABLE).select('updated_at').eq('id', me.id).maybeSingle()
+    if (error) return null
+    return (data as { updated_at?: string } | null)?.updated_at ?? null
+  } catch {
+    return null
+  }
+}
+
 /** The saved state as a JSON string, or null if none / signed out / unreachable. */
 export async function loadRemoteState(): Promise<string | null> {
   const head = await loadRemoteHead()

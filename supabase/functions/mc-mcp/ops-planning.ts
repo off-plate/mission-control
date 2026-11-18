@@ -15,6 +15,7 @@
    are LOG collections keyed by id (`focusSessions:<id>`, `ledger:<id>`), so every row
    written here gets a fresh newId and rows are only ever ADDED, never rewritten. */
 
+import { focusTopUp } from '../../../src/focustopup.ts'
 import {
   McError, arr, bury, dateKey, ensure, findTask, isDate, isTime, newId, pick, rowKey, slotForTime, SLOTS, updateTask,
   type Blob, type Ref, type Row, type Slot,
@@ -275,7 +276,8 @@ export function logTaskTime(b: Blob, ref: Ref, minutes: number, step?: Ref, now 
       const act = subs.reduce((a, s) => a + (s.actualMin ?? s.estimateMin ?? 0), 0)
       const lid = newId('l')
       ensure(b, 'ledger').unshift({ id: lid, title: t.title, category: t.category, estimateMin: est, actualMin: act, when: today, space: t.space, weekKey: isoWeekKey(today) })
-      ensure(b, 'focusSessions').unshift({ id: newId('f'), day: today, minutes: act, label: t.title, space: t.space, ledgerId: lid, at: stamp })
+      const add = focusTopUp(arr(b, 'focusSessions'), t.title, today, act) // only what the timer did not already bank
+      if (add > 0) ensure(b, 'focusSessions').unshift({ id: newId('f'), day: today, minutes: add, label: t.title, space: t.space, ledgerId: lid, at: stamp })
       say.push(`that was the last step, so "${t.title}" is done with ${fmtDuration(act)} in total (ledger and focus rows written)${goal ? `, ${goal}` : ''}`)
     } else if (!allDone) say.push(`${subs.filter((s) => !s.done).length} step(s) still open`)
     return { id: t.id, text: `${say.join('; ')}.` }
@@ -291,7 +293,8 @@ export function logTaskTime(b: Blob, ref: Ref, minutes: number, step?: Ref, now 
     const lid = newId('l')
     ensure(b, 'ledger').unshift({ id: lid, title: t.title, category: t.category, estimateMin: t.estimateMin, actualMin: mins, when: today, space: t.space, weekKey: isoWeekKey(today) })
     // Real time on a task is real time whether or not the timer ran: it is also a focus block (the app's own comment in logActual).
-    ensure(b, 'focusSessions').unshift({ id: newId('f'), day: today, minutes: mins, label: t.title, space: t.space, ledgerId: lid, at: stamp })
+    const add = focusTopUp(arr(b, 'focusSessions'), t.title, today, mins) // only what the timer did not already bank
+    if (add > 0) ensure(b, 'focusSessions').unshift({ id: newId('f'), day: today, minutes: add, label: t.title, space: t.space, ledgerId: lid, at: stamp })
     return { id: t.id, text: `"${t.title}" is done: ${fmtDuration(mins)} logged (ledger and focus rows written${t.estimateMin ? `, estimate was ${fmtDuration(t.estimateMin)}` : ', it had no estimate'})${say.length ? `; ${say.join('; ')}` : ''}.` }
   }
   return { id: t.id, text: `"${t.title}" already had its time logged, so only the number changed to ${fmtDuration(mins)} (no second ledger or focus row, as in the app).${say.length ? ` ${say.join('; ')}.` : ''}` }

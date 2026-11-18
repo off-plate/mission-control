@@ -12,6 +12,7 @@ import { MOCK_LEDGER } from '../mock'
 import { focusNeedMin } from '../types'
 import type { FocusSession, Goal, HabitDef, HabitTick, LedgerEntry, SpaceId, Task, TaskCategory } from '../types'
 import { newId, todayKey } from './shared'
+import { focusTopUp } from '../focustopup'
 import type { useGrowthSlice } from './growth'
 import type { usePlannerSlice } from './planner'
 
@@ -180,9 +181,13 @@ export function useLedgerSlice(
          path never wrote one. Sharing lid keeps the block attached to the
          same ledger row logActual already writes, rather than a second,
          orphaned one. */
-      const next = [{ id: newId('f'), day: todayKey(), minutes: actualMin, label: t.title, space: t.space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
-      setFocusSessions(next)
-      autoFrom(next, 0)
+      // only what the timer did not already bank (no double count)
+      const add = focusTopUp(focusSessions, t.title, todayKey(), actualMin)
+      if (add > 0) {
+        const next = [{ id: newId('f'), day: todayKey(), minutes: add, label: t.title, space: t.space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
+        setFocusSessions(next)
+        autoFrom(next, 0)
+      }
     }
   }
 
@@ -208,9 +213,12 @@ export function useLedgerSlice(
       ])
       /* Same as the flat-task path in logActual: the steps' real minutes
          count as focus even when Focus was never started for them. */
-      const next = [{ id: newId('f'), day: todayKey(), minutes: act, label: parent.title, space: parent.space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
-      setFocusSessions(next)
-      autoFrom(next, 0)
+      const add = focusTopUp(focusSessions, parent.title, todayKey(), act)
+      if (add > 0) {
+        const next = [{ id: newId('f'), day: todayKey(), minutes: add, label: parent.title, space: parent.space, ledgerId: lid, at: new Date().toISOString() }, ...focusSessions]
+        setFocusSessions(next)
+        autoFrom(next, 0)
+      }
     }
   }
 

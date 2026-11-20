@@ -120,5 +120,38 @@ const invite = (uid: string, title: string, mine: string, theirs = 'ACCEPTED') =
      !named.map((e) => e.title).includes('Lunch order'), named.map((e) => e.title).join(', '))
 }
 
+/* A MOVED OR CANCELLED OCCURRENCE OF A REPEATING MEETING. Google keeps the weekly rule and adds a separate
+   VEVENT with the same UID and a RECURRENCE-ID naming the occurrence it replaces. Without reading it, the
+   moved meeting showed twice ("Pravidelný status" at 11:00 AND at 14:00), and a cancelled one stayed. */
+{
+  const weekly = `BEGIN:VEVENT
+UID:status-1
+DTSTART;TZID=Europe/Prague:20261113T110000
+DTEND;TZID=Europe/Prague:20261113T120000
+RRULE:FREQ=WEEKLY;BYDAY=FR
+SUMMARY:Pravidelny status
+END:VEVENT
+BEGIN:VEVENT
+UID:status-1
+RECURRENCE-ID;TZID=Europe/Prague:20261120T110000
+DTSTART;TZID=Europe/Prague:20261120T140000
+DTEND;TZID=Europe/Prague:20261120T150000
+SUMMARY:Pravidelny status
+END:VEVENT
+BEGIN:VEVENT
+UID:status-1
+RECURRENCE-ID;TZID=Europe/Prague:20261127T110000
+DTSTART;TZID=Europe/Prague:20261127T110000
+DTEND;TZID=Europe/Prague:20261127T120000
+STATUS:CANCELLED
+SUMMARY:Pravidelny status
+END:VEVENT`
+  const ev = read(weekly, '2026-11-12', '2026-12-06')
+  const on = (d: string) => ev.filter((e) => e.day === d).map((e) => hhmm(e.start))
+  ok('a moved occurrence shows once, at its new time', JSON.stringify(on('2026-11-20')) === '["14:00"]', on('2026-11-20').join(', '))
+  ok('a cancelled occurrence is gone', on('2026-11-27').length === 0, on('2026-11-27').join(', '))
+  ok('the other weeks keep the usual time', JSON.stringify(on('2026-11-13')) === '["11:00"]' && JSON.stringify(on('2026-12-04')) === '["11:00"]', `${on('2026-11-13')} / ${on('2026-12-04')}`)
+}
+
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS')
 process.exit(fails.length ? 1 : 0)

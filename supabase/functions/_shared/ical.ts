@@ -134,6 +134,9 @@ interface Raw {
   where?: string
   rrule?: string
   exdates: Set<string>
+  /** Set on a VEVENT that replaces one occurrence of a repeating event (moved or cancelled): that occurrence's day. */
+  recurId?: string
+  cancelled?: boolean
   people: string[]
   link?: string
   description?: string
@@ -148,7 +151,10 @@ function readEvents(ics: string): Raw[] {
   for (const line of unfold(ics)) {
     if (line === 'BEGIN:VEVENT') { cur = { exdates: new Set(), people: [] , replies: new Map()}; continue }
     if (line === 'END:VEVENT') {
-      if (cur?.start && cur.title) out.push(cur as Raw)
+      // STATUS comes BEFORE SUMMARY in Google's feed, so a cancellation is applied here, not when it is read
+      if (cur?.cancelled) cur.title = ''
+      // a cancelled override has no title left but still has to cross its occurrence off the series
+      if (cur?.start && (cur.title || cur.recurId)) out.push(cur as Raw)
       cur = null
       continue
     }
@@ -169,6 +175,7 @@ function readEvents(ics: string): Raw[] {
       case 'SUMMARY': cur.title = unescape(value).trim(); break
       case 'LOCATION': cur.where = unescape(value).trim() || undefined; break
       case 'RRULE': cur.rrule = value.trim(); break
+      case 'RECURRENCE-ID': { const w = parseWhen(value, params); if (w) cur.recurId = dayKey(w.at); break }
       case 'UID': cur.uid = value.trim(); break
       case 'DESCRIPTION': cur.description = unescape(value); break
       case 'X-GOOGLE-CONFERENCE': cur.link = value.trim(); break
@@ -205,7 +212,7 @@ function readEvents(ics: string): Raw[] {
          is excluded, which is right for the case that actually happens (a
          standup called off) and wrong only for two copies of one event on one
          day, which a work calendar does not do. */
-      case 'STATUS': if (value.trim().toUpperCase() === 'CANCELLED') cur.title = ''; break
+      case 'STATUS': if (value.trim().toUpperCase() === 'CANCELLED') cur.cancelled = true; break
       default: break
     }
   }
@@ -324,7 +331,15 @@ const minutesOf = (d: Date) => { const z = zoned(d); return z.h * 60 + z.mi }
 export function parseIcs(ics: string, from: Date, to: Date, ownerEmail?: string): CalEvent[] {
   const out: CalEvent[] = []
   const owner = ownerOf(ics, ownerEmail)
-  for (const e of readEvents(ics)) {
+  const events = readEvents(ics)
+  /* A VEVENT with a RECURRENCE-ID replaces one occurrence of the series with the same UID: moved (it is
+     shown at its own time below) or cancelled (it has no title and is skipped). Either way the series must
+     not produce that occurrence too, or a moved meeting shows twice ("status" at 11:00 AND 14:00). Same
+     whole-day rule as EXDATE. */
+  const replaced = new Map<string, Set<string>>()
+  for (const e of events) if (e.recurId && e.uid) (replaced.get(e.uid) ?? replaced.set(e.uid, new Set()).get(e.uid)!).add(e.recurId)
+  for (const e of events) if (e.rrule && !e.recurId && e.uid) for (const d of replaced.get(e.uid) ?? []) e.exdates.add(d)
+  for (const e of events) {
     if (!e.title) continue
     /* A MEETING HE TURNED DOWN IS NOT HIS DAY. Google keeps declined events in
        the feed, so they were being counted, planned around and read out to him:

@@ -162,5 +162,21 @@ const ok = (cond, label) => { if (!cond) fail.push(label); console.log(`${cond ?
   ok(box.dirty === false, 'and the outbox settles clean')
 }
 
+// ---------------------------------------------------------------- scenario: the save hands its result back
+// What the server holds after a save (this device's work merged with everyone else's) comes back to the store,
+// so a stale device stops re-applying its old rows on the next pull (2026-11-22). Not when a newer edit overtook it.
+{
+  store.clear(); handlers.clear(); isOnline = true
+  const got = []
+  const box = new Outbox(async (json) => { await sleep(60); return { ok: true, merged: json + '+server' } }, true)
+  box.onSaved((m) => got.push(m))
+  box.push('A'); await sleep(150)
+  ok(got.length === 1 && got[0] === 'A+server', `a clean save hands back the merged copy (got ${JSON.stringify(got)})`)
+  got.length = 0
+  box.push('B'); await sleep(10); box.push('C'); await sleep(300)
+  ok(!got.includes('B+server'), 'a save that a newer edit overtook is not handed back')
+  ok(got.includes('C+server'), 'the newest save is handed back')
+}
+
 console.log(fail.length ? `\n${fail.length} FAILED` : '\nall sync checks passed')
 process.exit(fail.length ? 1 : 0)

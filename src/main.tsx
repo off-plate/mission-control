@@ -109,8 +109,13 @@ async function boot() {
             /* Merged, never pasted over: this device may hold work the remote
                row does not, when a staler device saved after it. Hydrating the
                remote blob wholesale is how two evenings were lost. */
+            /* ...but only when this device HAS unsent work. With nothing unsent the server already holds
+               everything this device did, and merging let an old local copy with a newer savedAt undo
+               work done elsewhere (2026-11-22). ponytail: with unsent work it is still the two-way
+               merge (no last-seen copy survives a reload); persist one if that case ever bites. */
             const local = localStorage.getItem(STORAGE_KEY)
-            localStorage.setItem(STORAGE_KEY, local ? mergeStates(local, remote) : remote)
+            const unsent = localStorage.getItem('mc-sync-dirty') !== null
+            localStorage.setItem(STORAGE_KEY, local && unsent ? mergeStates(local, remote) : remote)
           } else localStorage.removeItem(STORAGE_KEY)
         }
       } else if (localStorage.getItem(LOCAL_ONLY_KEY) !== '1') {

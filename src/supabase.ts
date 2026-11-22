@@ -278,11 +278,15 @@ export async function saveRemoteState(json: string): Promise<SaveResult> {
     }
   } catch { /* fall through to the full path, which reports offline properly */ }
 
+  const seen = known // what this device last saw, captured BEFORE the read below replaces it
   const head = await loadRemoteHead()
   if (!head.ok) return { ok: false, reason: head.reason, message: head.message }
 
   try {
-    const merged = head.json ? mergeStates(json, head.json) : json
+    /* Someone else wrote since this device last saw the row: merge three-way against what it last
+       saw, so rows and fields this device did not touch take the server's newer version (a stale
+       background tab must not undo work done elsewhere). */
+    const merged = head.json ? mergeStates(json, head.json, seen && seen.stamp !== head.stamp ? seen.json : null) : json
     const data = JSON.parse(merged)
     const { data: row, error } = await c.from(TABLE)
       .upsert({ id: me.id, owner: me.id, data, updated_at: new Date().toISOString() }).select('updated_at')

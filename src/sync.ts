@@ -56,6 +56,12 @@ export class Outbox {
   private attempt = 0
   private timer: number | undefined
   private listeners = new Set<(s: SyncStatus) => void>()
+  private savedListeners = new Set<(merged: string) => void>()
+
+  /** Called with what the server now holds after a save that nothing newer overtook. The store takes it
+   *  as is: the save already merged this device's work in, and keeping the old local copy instead is how
+   *  a stale device re-applied its old rows on the next pull (2026-11-22). */
+  onSaved(fn: (merged: string) => void): () => void { this.savedListeners.add(fn); return () => { this.savedListeners.delete(fn) } }
   private phase: SyncPhase = 'synced'
   private detail = ''
   private started = false
@@ -134,6 +140,7 @@ export class Outbox {
           writeNum(DIRTY_KEY, null)
           writeNum(LAST_KEY, Date.now())
           this.set('synced', '')
+          if (res.merged && res.merged !== body) this.savedListeners.forEach((fn) => { try { fn(res.merged) } catch { /* a listener is not the sync's problem */ } })
         } else {
           this.run('follow-up')
         }

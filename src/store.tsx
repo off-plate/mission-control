@@ -382,7 +382,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
          persisted so quitting while offline does not lose it. */
       if (SUPABASE_ENABLED) {
         window.clearTimeout(remoteSaveTimer.current)
-        remoteSaveTimer.current = window.setTimeout(() => { outbox.push(json) }, 800)
+        remoteSaveTimer.current = window.setTimeout(() => { remoteSaveTimer.current = undefined; outbox.push(json) }, 800)
       }
     }
     /* The save on load goes at once: it carries migrations and the unsent
@@ -397,11 +397,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      never pasted over: what is in memory here is one side of the merge and his
      work on this device survives it. Applying it makes the save effect fire,
      which is how the merged truth goes back out to everyone. */
-  const applyExternal = (incoming: string) => {
+  /* from: where `incoming` came from.
+     'server' (a pull) and 'saved' (the result of this device's own save) are the server's truth, which
+     already holds everything this device sent: taken AS IS, because merging let a stale copy win on its
+     newer savedAt and undo work done on another device (2026-11-22). A pull while this device has unsent
+     work is skipped: the save merges three-way and hands its result back through outbox.onSaved.
+     'tab' (another tab of this browser) is just another device's copy, possibly a stale one: merged, as
+     before (a stale tab taken as is wiped a written reflection, caught by the qa sleeping-phone step). */
+  const applyExternal = (incoming: string, from: 'server' | 'saved' | 'tab' = 'tab') => {
     flushLocal()
     const mine = latestJson.current || localStorage.getItem(STORAGE_KEY) || ''
     if (!incoming || incoming === mine) return
-    const merged = mine ? mergeStates(mine, incoming) : incoming
+    const unsent = outbox.dirty || remoteSaveTimer.current !== undefined
+    if (from === 'server' && unsent) return
+    const merged = from === 'tab' && mine ? mergeStates(mine, incoming) : incoming
     let p: PersistedState
     try { p = JSON.parse(merged) as PersistedState } catch { return }
     if (p.schema !== STORAGE_KEY) return
@@ -478,6 +487,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
      instead of freezing the one from mount. */
   const applyExternalRef = useRef(applyExternal)
   applyExternalRef.current = applyExternal
+  /* After a save lands, take what the server now holds (this device's work merged with everyone
+     else's) as the truth, unless a newer edit is already waiting to go. */
+  useEffect(() => outbox.onSaved((merged) => { if (remoteSaveTimer.current === undefined) applyExternalRef.current(merged, 'saved') }), [])
 
   /* Another tab of the same browser. It writes localStorage; this fires there
      and nowhere else, which is exactly the signal needed.
@@ -532,7 +544,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (stop) return
       lastPullStamp.current = stamp
       lastPullMine.current = latestJson.current
-      if (remote) applyExternalRef.current(remote)
+      if (remote) applyExternalRef.current(remote, 'server')
       void pullOutreach()
       /* And the other direction. Without this, work done offline never leaves the
          device: applyExternal finds local is already a superset of the stale

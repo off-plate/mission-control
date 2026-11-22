@@ -405,6 +405,18 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
     emit()
   }
 
+  /* A link inside an editable box only moves the caret when clicked, so the
+     browser never follows it. Open it ourselves on a plain click or tap; a
+     drag that selects the link's text still selects it, so it stays editable. */
+  const onClick = (e: React.MouseEvent) => {
+    const a = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null
+    if (!a || !/^(https?:|mailto:|tel:)/i.test(a.href)) return
+    const sel = window.getSelection()
+    if (sel && !sel.isCollapsed) return
+    e.preventDefault()
+    window.open(a.href, '_blank', 'noopener,noreferrer')
+  }
+
   const toggleBlock = (tag: 'h3' | 'blockquote') => {
     const root = ref.current
     if (!root) return
@@ -575,6 +587,7 @@ export function Editor({ note, onChange, lead, trail, children, tools, plain, sl
         onMouseUp={trackMenu}
         onBlur={() => { setMenu(null); emit() }}
         onMouseDown={onMouseDown}
+        onClick={onClick}
             onKeyDown={(e) => {
               /* The menu owns these keys while it is open, and only then, so
                  Enter still sends a command and Escape still does nothing when

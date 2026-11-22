@@ -257,7 +257,42 @@ export function rowKey(field: string, row: Row): string {
  *  row identity, a row both sides hold takes the newer side's version, and
  *  anything in either graveyard is dropped. Falls back to `a` when anything is
  *  off, because a merge that cannot be trusted must not be the one that wins. */
-export function mergeStates(a: string, b: string): string {
+/* Three-way merge (2026-11-22). `base` is the copy the saving device (side a) last SAW from the
+   server. Without it, the newer savedAt wins every row and scalar, and a device stamps savedAt when it
+   SAVES, so a stale device (a background tab that never pulled) became "newer" and undid work done
+   elsewhere: his ticks and running focus, written from the sidebar through the connector, vanished.
+   With a base: whatever side a did not change since base takes side b's version. Real conflicts (both
+   changed it) still go to the newer save, as before. No base = the two-way merge, unchanged. */
+export function mergeStates(a: string, b: string, base?: string | null): string {
+  const two = mergeTwo(a, b)
+  if (!base) return two
+  try {
+    const A = JSON.parse(a) as BlobState, B = JSON.parse(b) as BlobState, O = JSON.parse(base) as BlobState
+    const out = JSON.parse(two) as BlobState
+    if (!A || !B || !O || !out || A.schema !== B.schema || O.schema !== A.schema) return two
+    const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y)
+    // keyed rows: a row side a left as it was in base takes side b's row
+    for (const [field, keyOf] of Object.entries(ALL_KEYS)) {
+      if (!Array.isArray(out[field]) || !Array.isArray(B[field])) continue
+      const inA = new Map(((A[field] as Row[]) ?? []).filter((r) => r && typeof r === 'object').map((r) => [keyOf(r), r]))
+      const inO = new Map(((O[field] as Row[]) ?? []).filter((r) => r && typeof r === 'object').map((r) => [keyOf(r), r]))
+      const inB = new Map(((B[field] as Row[]) ?? []).filter((r) => r && typeof r === 'object').map((r) => [keyOf(r), r]))
+      out[field] = (out[field] as Row[]).map((r) => {
+        const k = keyOf(r), b = inB.get(k)
+        return b && inA.has(k) && inO.has(k) && same(inA.get(k), inO.get(k)) ? b : r
+      })
+    }
+    // plain fields (activeFocus and the like): unchanged on side a since base = side b's value
+    const skip = new Set([...Object.keys(ALL_KEYS), 'schema', 'savedAt', 'lastWrite', 'graveyard', 'removedSeeds', 'records', 'twoLives'])
+    for (const f of new Set([...Object.keys(B), ...Object.keys(O)])) {
+      if (skip.has(f)) continue
+      if (same(A[f], O[f]) && !same(A[f], B[f])) { if (B[f] === undefined) delete out[f]; else out[f] = B[f] }
+    }
+    return JSON.stringify(out)
+  } catch { return two }
+}
+
+function mergeTwo(a: string, b: string): string {
   /* Each side is parsed on its own, so one unreadable blob leaves the readable
      one standing instead of taking it down with it. */
   const read = (j: string): BlobState | null => {

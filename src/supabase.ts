@@ -183,8 +183,20 @@ export function clearAuthFragment(): void {
    know nothing and must not write anything, or an offline laptop would overwrite
    a phone's good data with its own stale blob the moment one packet got through. */
 export type Head =
-  | { ok: true; json: string | null }
+  | { ok: true; json: string | null; stamp: string | null }
   | { ok: false; reason: 'offline' | 'signed-out' | 'error'; message?: string }
+
+/* The last server row this device KNOWS (its updated_at and its JSON), set by
+   every full read and by every save. A save or a poll whose stamp matches it
+   needs no download at all. Without this, every save read the whole row first
+   (~465 KB to 1.7 MB) and the next poll read it again: 32,000 saves, and the
+   18 Nov 2026 free-plan egress cap (5.99 of 5 GB, 402 on every request). */
+let known: { stamp: string; json: string } | null = null
+
+/** The row's JSON if its stamp is the one this device already holds, else null. */
+export function knownRemote(stamp: string | null): string | null {
+  return stamp && known && known.stamp === stamp ? known.json : null
+}
 
 export async function loadRemoteHead(): Promise<Head> {
   const c = db()
@@ -192,9 +204,12 @@ export async function loadRemoteHead(): Promise<Head> {
   const me = await currentAccount()
   if (!me) return { ok: false, reason: 'signed-out' }
   try {
-    const { data, error } = await c.from(TABLE).select('data').eq('id', me.id).maybeSingle()
+    const { data, error } = await c.from(TABLE).select('data,updated_at').eq('id', me.id).maybeSingle()
     if (error) return { ok: false, reason: 'error', message: error.message }
-    return { ok: true, json: data?.data ? JSON.stringify(data.data) : null }
+    const json = data?.data ? JSON.stringify(data.data) : null
+    const stamp = (data as { updated_at?: string } | null)?.updated_at ?? null
+    known = json && stamp ? { stamp, json } : null
+    return { ok: true, json, stamp }
   } catch (e) {
     // Thrown, rather than returned as an error, is what a dead connection looks like.
     return { ok: false, reason: 'offline', message: e instanceof Error ? e.message : String(e) }
@@ -243,14 +258,37 @@ export async function saveRemoteState(json: string): Promise<SaveResult> {
   const me = await currentAccount()
   if (!me) return { ok: false, reason: 'signed-out' }
 
+  /* Cheap path: the server row still carries the stamp this device last saw,
+     so merge against the copy in memory and write only if the stamp STILL
+     matches (one atomic UPDATE ... WHERE updated_at = stamp). Zero rows back
+     means someone else wrote in between: fall through to the full read. */
+  try {
+    const stamp = await loadRemoteStamp()
+    const base = knownRemote(stamp)
+    if (stamp && base) {
+      const merged = mergeStates(json, base)
+      const next = new Date().toISOString()
+      const { data: hit, error } = await c.from(TABLE)
+        .update({ data: JSON.parse(merged), updated_at: next }).eq('id', me.id).eq('updated_at', stamp)
+        .select('updated_at')
+      if (!error && hit && hit.length) {
+        known = { stamp: (hit[0] as { updated_at: string }).updated_at, json: merged }
+        return { ok: true, merged }
+      }
+    }
+  } catch { /* fall through to the full path, which reports offline properly */ }
+
   const head = await loadRemoteHead()
   if (!head.ok) return { ok: false, reason: head.reason, message: head.message }
 
   try {
     const merged = head.json ? mergeStates(json, head.json) : json
     const data = JSON.parse(merged)
-    const { error } = await c.from(TABLE).upsert({ id: me.id, owner: me.id, data, updated_at: new Date().toISOString() })
+    const { data: row, error } = await c.from(TABLE)
+      .upsert({ id: me.id, owner: me.id, data, updated_at: new Date().toISOString() }).select('updated_at')
     if (error) return { ok: false, reason: 'error', message: error.message }
+    const stamp = (row?.[0] as { updated_at?: string } | undefined)?.updated_at
+    known = stamp ? { stamp, json: merged } : null
     return { ok: true, merged }
   } catch (e) {
     return { ok: false, reason: 'offline', message: e instanceof Error ? e.message : String(e) }

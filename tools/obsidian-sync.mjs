@@ -287,9 +287,30 @@ async function signedIn() {
 /** The state row as it stands on the server right now. Read fresh immediately
  *  before every write, exactly as src/supabase.ts does, so a save from here can
  *  never erase what another device banked in the meantime. */
+/* This job runs every 120 s, day and night. It used to download the whole row
+   (~0.5 to 1.7 MB) on every run: up to ~1.2 GB a day, a big part of the
+   18 Nov 2026 free-plan egress overage. Now it asks for updated_at first (a few
+   bytes) and reuses the copy on disk while that stamp has not moved. */
+const HEAD_CACHE = path.join(STATE_DIR, 'head-cache.json')
+
+async function readCache() {
+  try { return JSON.parse(await fsp.readFile(HEAD_CACHE, 'utf8')) } catch { return null }
+}
+
+async function writeCache(stamp, data) {
+  if (!stamp) return
+  try { await fsp.writeFile(HEAD_CACHE, JSON.stringify({ stamp, data })) } catch { /* cache is optional */ }
+}
+
 async function readHead(c, uid) {
-  const { data, error } = await c.from(TABLE).select('data').eq('id', uid).maybeSingle()
+  const cached = await readCache()
+  if (cached?.stamp) {
+    const { data: s, error: sErr } = await c.from(TABLE).select('updated_at').eq('id', uid).maybeSingle()
+    if (!sErr && s?.updated_at === cached.stamp) return cached.data ?? null
+  }
+  const { data, error } = await c.from(TABLE).select('data,updated_at').eq('id', uid).maybeSingle()
   if (error) throw new Error(`could not read state: ${error.message}`)
+  await writeCache(data?.updated_at, data?.data ?? null)
   return data?.data ?? null
 }
 
@@ -304,10 +325,11 @@ async function writeHead(c, uid, state) {
      else in the copy being stamped is current; being the newer side is true,
      not a way of winning. */
   state.savedAt = Date.now()
-  const { error } = await c.from(TABLE).upsert({
+  const { data: row, error } = await c.from(TABLE).upsert({
     id: uid, owner: uid, data: state, updated_at: new Date().toISOString(),
-  })
+  }).select('updated_at')
   if (error) throw new Error(`could not write state: ${error.message}`)
+  await writeCache(row?.[0]?.updated_at, state)
 }
 
 /* ---- the ledger -----------------------------------------------------------

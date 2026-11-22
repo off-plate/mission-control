@@ -1,7 +1,7 @@
 import { haptic } from './haptic'
 import { flushSync } from 'react-dom'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, loadRemoteStamp, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
+import { SUPABASE_ENABLED, deleteRemoteState, claimInbox, onAccountChange, loadRemoteState, loadRemoteStamp, knownRemote, readOutreachEvents, readProspectSheet, stampOutreachEvents, stampProspectSheet } from './supabase'
 import { outbox } from './sync'
 import { estimateTask } from './ai'
 import { estimateFor } from './estimate'
@@ -526,7 +526,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         void pullOutreach()
         return
       }
-      const remote = await loadRemoteState()
+      /* Our own last save (or last full read) is already in memory under this
+         stamp: use it instead of downloading the row again. */
+      const remote = knownRemote(stamp) ?? await loadRemoteState()
       if (stop) return
       lastPullStamp.current = stamp
       lastPullMine.current = latestJson.current
